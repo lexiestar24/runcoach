@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16110d">
+<title>RunCoach</title>
+<style>
+  /* Single warm, earthy dark theme. Variable names are kept from the original
+     palette for stability; the values are repointed to earthy tones. So e.g.
+     --blue is a terracotta/ochre primary, --orange a rust, --green an olive. */
+  :root{
+    color-scheme: dark;
+    --page:#16110d; --surface:#201a14; --surface-2:#2b231b;
+    --text:#f0e7d8; --text-2:#c2b3a0; --muted:#94806c;
+    --grid:#322a20; --baseline:#4a3f30; --border:rgba(240,231,216,.11);
+    --blue:#fdc57e;   /* primary: warm peach (easy) */
+    --green:#837e31;  /* olive */
+    --magenta:#cf8f83;/* dusty rose */
+    --yellow:#e6c057; /* golden ochre */
+    --aqua:#5f9e8b;   /* sage-teal */
+    --orange:#004f46; /* deep teal (moderate) */
+    --violet:#6f88a0; /* muted denim (was mauve/pink) */
+    --red:#ae5225;    /* burnt rust (hard) */
+    --good:#94b052; --warning:#e0a83f; --serious:#d98a5e; --critical:#cf5a3f;
+    --success-ink:#a9c15c;
+    --shadow:0 1px 3px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.3);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  .wrap{max-width:1000px;margin:0 auto;padding:16px 16px 64px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 20px;flex-wrap:wrap}
+  h1{font-size:20px;margin:0;letter-spacing:-.02em}
+  h1 .dot{color:var(--blue)}
+  .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  button{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:8px 14px;cursor:pointer;box-shadow:var(--shadow)}
+  button:active{transform:translateY(1px)}
+  section{margin:22px 0}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;font-weight:600}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:12px}
+  .tiles{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  .tile .k{font-size:12px;color:var(--text-2)}
+  .tile .v{font-size:30px;font-weight:650;letter-spacing:-.02em;margin-top:6px;line-height:1}
+  .tile .v small{font-size:14px;color:var(--muted);font-weight:500;margin-left:3px}
+  .tile .d{font-size:12px;margin-top:6px;color:var(--muted)}
+  .up{color:var(--success-ink);font-weight:600}
+  /* readiness hero */
+  .hero{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .ring{flex:0 0 auto}
+  .hero .body{flex:1;min-width:220px}
+  .hero .label{font-size:22px;font-weight:650;letter-spacing:-.02em}
+  .hero .verdict{color:var(--text-2);margin:6px 0 12px;font-size:15px;line-height:1.45}
+  .reasons{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+  .reasons li{font-size:13px;color:var(--text-2);padding-left:18px;position:relative;line-height:1.4}
+  .reasons li::before{content:"";position:absolute;left:2px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--blue)}
+  /* progress */
+  .bar{height:12px;border-radius:6px;background:var(--grid);overflow:hidden;margin:10px 0 6px}
+  .bar > i{display:block;height:100%;border-radius:6px;background:var(--blue)}
+  /* tips + adjustments */
+  .stack{display:grid;gap:10px}
+  .note{background:var(--surface);border:1px solid var(--border);border-left-width:4px;border-radius:12px;
+    padding:12px 14px;font-size:14px;line-height:1.5;color:var(--text-2);box-shadow:var(--shadow)}
+  .note .tag{display:inline-block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--text);margin-bottom:4px}
+  .note.win{border-left-color:var(--good)} .note.recovery{border-left-color:var(--blue)}
+  .note.sleep{border-left-color:var(--green)} .note.pacing{border-left-color:var(--orange)}
+  .note.high{border-left-color:var(--critical)} .note.med{border-left-color:var(--warning)}
+  .note.low{border-left-color:var(--baseline)}
+  /* charts */
+  .chart-title{font-size:14px;font-weight:600;margin:0 0 2px}
+  .chart-sub{font-size:12px;color:var(--muted);margin:0 0 12px}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  svg{display:block;max-width:100%;height:auto}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-2)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .legend i.line{height:3px;border-radius:2px;width:16px}
+  /* upcoming table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .moved{color:var(--muted);font-size:11px;margin-left:5px}
+  tbody tr{cursor:pointer}
+  tbody tr:hover td{background:var(--surface-2)}
+  tbody tr.wkrow{cursor:default}
+  tr.wkrow td{background:#004f46;color:#f0e7d8;font-weight:700;font-size:11px;
+    text-transform:uppercase;letter-spacing:.06em;padding:7px 8px}
+  tr.wkrow:hover td{background:#004f46}
+  .chev{color:var(--muted)}
+  /* detail nav */
+  .navrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .navbtn{font-size:13px;padding:6px 12px;border-radius:9px;background:#ae5225;color:#fff;border-color:transparent}
+  .navbtn[disabled]{opacity:.3;cursor:default;pointer-events:none}
+  .navpos{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:50}
+  .overlay.open{display:flex}
+  .sheet{background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.5);
+    width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:20px 20px calc(24px + env(safe-area-inset-bottom))}
+  @media(min-width:600px){.overlay{align-items:center}.sheet{border-radius:20px}}
+  .sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--baseline);margin:0 auto 14px}
+  .sheet h3{margin:0 0 2px;font-size:18px;letter-spacing:-.01em}
+  .sheet .meta{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .block{margin:14px 0}
+  .block .lab{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:6px}
+  .block .txt{font-size:14px;line-height:1.55;color:var(--text-2);white-space:pre-wrap}
+  .warm{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .warm ol{margin:0;padding-left:18px} .warm li{font-size:14px;line-height:1.5;color:var(--text-2);margin:3px 0}
+  .statrow{display:flex;gap:18px;flex-wrap:wrap;background:var(--surface-2);border-radius:12px;padding:12px 14px}
+  .statrow .s .k{font-size:11px;color:var(--muted)} .statrow .s .v{font-size:18px;font-weight:650}
+  .eval{background:var(--surface-2);border-radius:12px;padding:12px 14px;border-left:4px solid var(--good)}
+  .eval.short,.eval.easy-for-hard{border-left-color:var(--warning)}
+  .eval.ran-hot{border-left-color:var(--serious)}
+  .eval-h{font-weight:650;font-size:14.5px;margin-bottom:6px}
+  .eval-pts{margin:0;padding-left:18px} .eval-pts li{font-size:13.5px;line-height:1.5;color:var(--text-2);margin:3px 0}
+  .closex{position:sticky;top:0;float:right;background:none;border:none;box-shadow:none;font-size:22px;color:var(--muted);padding:0 4px;cursor:pointer}
+  .tip{position:fixed;z-index:60;display:none;pointer-events:none;background:var(--surface-2);
+    border:1px solid var(--border);border-radius:10px;padding:8px 11px;font-size:12.5px;color:var(--text);
+    box-shadow:var(--shadow);max-width:250px;line-height:1.45}
+  .tip b{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:3px;text-transform:none}
+  .pill{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+  .pill.done{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--success-ink)}
+  .pill.upcoming{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--blue)}
+  .pill.missed{background:color-mix(in srgb,var(--baseline) 30%,transparent);color:var(--text-2)}
+  .wt{font-size:11px;padding:1px 7px;border-radius:5px;color:#fff;font-weight:600}
+  .loading{color:var(--muted);text-align:center;padding:60px 0}
+  .err{color:var(--critical);text-align:center;padding:40px 0;font-size:14px}
+  @media(max-width:520px){ .tile .v{font-size:26px} .wrap{padding:12px 12px 60px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Run<span class="dot">·</span>Coach</h1>
+      <div class="sub" id="stamp">loading…</div>
+    </div>
+    <button id="refresh">↻ Sync Garmin</button>
+  </header>
+  <div id="app"><div class="loading">Loading your data…</div></div>
+</div>
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+<div class="tip" id="tip"></div>
+
+<script>
+const $ = (s,el=document)=>el.querySelector(s);
+const el = (t,attrs={},kids=[])=>{const n=document.createElementNS(t==='svg'||SVGTAGS.has(t)?SVGNS:HTMLNS,t);
+  for(const k in attrs){if(k==='class')n.setAttribute('class',attrs[k]);else if(k==='html')n.innerHTML=attrs[k];else if(k==='text')n.textContent=attrs[k];else n.setAttribute(k,attrs[k]);}
+  (Array.isArray(kids)?kids:[kids]).forEach(c=>{if(c==null||c===false)return;
+    n.appendChild(typeof c==='object'?c:document.createTextNode(String(c)));});return n;};
+const SVGNS='http://www.w3.org/2000/svg',HTMLNS='http://www.w3.org/1999/xhtml';
+const SVGTAGS=new Set(['svg','g','path','rect','line','circle','text','polyline','defs','clipPath']);
+const cssv=n=>n&&n.startsWith('--')?getComputedStyle(document.documentElement).getPropertyValue(n).trim():n;
+// Effort-based coloring: easy days vs hard days, matching the effort chart's dots.
+const HARD_SET=new Set(['tempo','interval','race']);
+const effortColor=t=>HARD_SET.has(t)?'--red':'--blue';
+
+// short date like "Jul 18"
+const fmtDate=iso=>{try{return new Date(iso+'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return iso;}};
+
+// shared hover/tap tooltip
+function bindTip(node,html){
+  node.style.cursor='pointer';
+  const show=e=>{const t=$('#tip');t.innerHTML=html;t.style.display='block';
+    const r=t.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+14;
+    if(x+r.width>window.innerWidth-8)x=e.clientX-r.width-14;
+    if(y+r.height>window.innerHeight-8)y=e.clientY-r.height-14;
+    t.style.left=Math.max(6,x)+'px';t.style.top=Math.max(6,y)+'px';};
+  node.addEventListener('pointerenter',show);
+  node.addEventListener('pointermove',show);
+  node.addEventListener('pointerleave',()=>{$('#tip').style.display='none';});
+  node.addEventListener('pointerdown',e=>{e.stopPropagation();show(e);});
+}
+
+// schedule rows (ordered) + current index, for prev/next navigation in the detail sheet
+let SCHED=[], schedIdx=0;
+
+// ---------- chart helpers (inline SVG) ----------
+function svgEl(w,h){return el('svg',{viewBox:`0 0 ${w} ${h}`,width:w,height:h,role:'img'});}
+
+function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],baseline=null,unit='',
+    ptColor=null,tipHtml=null,line=true,refs=[]}){
+  // Reference-line labels (baseline + refs) live in a right-hand margin, clear of
+  // the plotted lines. Size the right pad to the widest such label so nothing overlaps.
+  const rlabs=[];
+  if(baseline!=null) rlabs.push(`baseline ${fmt(baseline)}`);
+  refs.forEach(r=>rlabs.push(r.label));
+  const rpad=rlabs.length?Math.max(14,Math.max(...rlabs.map(t=>t.length))*5.4+14):14;
+  const pad={l:38,r:rpad,t:14,b:26}, iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
+  const pts=data.filter(d=>d[yKey]!=null);
+  const ys=pts.map(d=>d[yKey]); let ymin=Math.min(...ys),ymax=Math.max(...ys);
+  bands.forEach(b=>{ymin=Math.min(ymin,b.lo);ymax=Math.max(ymax,b.hi);});
+  refs.forEach(r=>{ymin=Math.min(ymin,r.y);ymax=Math.max(ymax,r.y);});
+  const padY=(ymax-ymin)*.12||5; ymin=Math.floor(ymin-padY); ymax=Math.ceil(ymax+padY);
+  const X=i=>pad.l+(pts.length<2?iw/2:iw*i/(pts.length-1));
+  const Y=v=>pad.t+ih-ih*(v-ymin)/(ymax-ymin||1);
+  const s=svgEl(w,h);
+  // deferred labels, drawn LAST so nothing hides them
+  const labels=[];
+  // a solid colored tag (white text) used for the in-plot band labels
+  const tag=(x,y,fill,text)=>{const cw=text.length*5.4+10;
+    const g=el('g',{});
+    g.appendChild(el('rect',{x:x-4,y:y-11,width:cw,height:15,rx:4,fill:cssv(fill),opacity:.92}));
+    g.appendChild(el('text',{x,y,'text-anchor':'start',fill:'#fff','font-size':10,'font-weight':600},text));
+    labels.push(g);};
+  // a plain label parked in the right margin, aligned to a horizontal line's y
+  const marginLabel=(y,fill,text,bold)=>labels.push(
+    el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv(fill),'font-size':10,'font-weight':bold?600:400},text));
+  bands.forEach(b=>{const y1=Y(Math.min(b.hi,ymax)),y2=Y(Math.max(b.lo,ymin));
+    if(b.hi>ymin&&b.lo<ymax){s.appendChild(el('rect',{x:pad.l,y:y1,width:iw,height:Math.max(0,y2-y1),fill:cssv(b.color),opacity:.14}));
+      if(b.label)tag(pad.l+6,y1+13,b.color,b.label);}});
+  for(let g=0;g<=3;g++){const v=ymin+(ymax-ymin)*g/3,y=Y(v);
+    s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
+    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':10},String(Math.round(v))));}
+  if(baseline!=null){const y=Y(baseline);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
+    marginLabel(y,'--muted',`baseline ${fmt(baseline)}`,false);}
+  refs.forEach(r=>{const y=Y(r.y);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv(r.color||'--muted'),'stroke-width':1.5,'stroke-dasharray':'2 3'}));
+    marginLabel(y,r.color||'--muted',r.label,true);});
+  if(line){const dpath=pts.map((d,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(d[yKey]).toFixed(1)}`).join(' ');
+    s.appendChild(el('path',{d:dpath,fill:'none',stroke:cssv(ptColor?'--baseline':color),'stroke-width':ptColor?1.5:2,'stroke-linejoin':'round','stroke-linecap':'round',opacity:ptColor?.7:1}));}
+  pts.forEach((d,i)=>{const col=ptColor?ptColor(d):color;
+    const c=el('circle',{cx:X(i),cy:Y(d[yKey]),r:ptColor?4.5:3.6,fill:ptColor?cssv(col):cssv('--surface'),stroke:cssv(col),'stroke-width':2});
+    bindTip(c, tipHtml?tipHtml(d):`<b>${fmtDate(d.date)}</b>${fmt(d[yKey])}${unit}`);s.appendChild(c);});
+  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:X(i),y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':10},pts[i].date.slice(5)));});
+  labels.forEach(l=>s.appendChild(l));  // labels on top
+  return s;
+}
+
+function groupedBars(data,{w=680,h=240}){
+  const pad={l:34,r:10,t:14,b:34}, iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
+  const ymax=Math.max(10,...data.map(d=>Math.max(d.planned,d.actual)))*1.1;
+  const Y=v=>pad.t+ih-ih*v/ymax;
+  const bw=iw/data.length, inner=bw*0.7, each=inner/2;
+  const s=svgEl(w,h);
+  for(let g=0;g<=4;g++){const v=ymax*g/4,y=Y(v);
+    s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
+    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':10},String(Math.round(v))));}
+  data.forEach((d,i)=>{const x0=pad.l+bw*i+(bw-inner)/2;
+    const mk=(val,off,color,cls)=>{const y=Y(val),bh=pad.t+ih-y;
+      const r=el('rect',{x:x0+off,y,width:each-2,height:Math.max(0,bh),rx:3,fill:cssv(color)});
+      bindTip(r,`<b>Week ${d.week}</b>Planned: ${d.planned} mi<br>Actual: ${d.actual} mi`);s.appendChild(r);};
+    mk(d.planned,0,'--baseline','planned'); mk(d.actual,each,'--blue','actual');
+    if(i%2===0||data.length<=12)s.appendChild(el('text',{x:x0+inner/2,y:h-16,'text-anchor':'middle',fill:cssv('--muted'),'font-size':9},d.week));
+  });
+  s.appendChild(el('text',{x:pad.l+iw/2,y:h-3,'text-anchor':'middle',fill:cssv('--muted'),'font-size':10},'training week'));
+  return s;
+}
+
+function barChart(data,{yKey,w=680,h=200,color='--blue',target=null,unit='',tipHtml=null}){
+  const tlab=target!=null?`target ${target}${unit}`:null;
+  const pad={l:34,r:tlab?tlab.length*5.4+14:10,t:14,b:26}, iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
+  const pts=data.filter(d=>d[yKey]!=null);
+  const ymax=Math.max(1,...pts.map(d=>d[yKey]))*1.15;
+  const Y=v=>pad.t+ih-ih*v/ymax, bw=iw/pts.length;
+  const s=svgEl(w,h);
+  for(let g=0;g<=3;g++){const v=ymax*g/3,y=Y(v);
+    s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
+    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':10},v.toFixed(0)));}
+  pts.forEach((d,i)=>{const y=Y(d[yKey]),x=pad.l+bw*i+bw*0.15;
+    const r=el('rect',{x,y,width:bw*0.7,height:Math.max(0,pad.t+ih-y),rx:3,fill:cssv(color)});
+    bindTip(r, tipHtml?tipHtml(d):`<b>${fmtDate(d.date)}</b>${d[yKey]}${unit}`);s.appendChild(r);});
+  if(target!=null){const y=Y(target);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
+    s.appendChild(el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv('--muted'),'font-size':10},tlab));}
+  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:pad.l+bw*i+bw/2,y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':10},pts[i].date.slice(5)));});
+  return s;
+}
+
+// donut ring for readiness
+function ring(score,color){
+  const w=120,r=48,cx=60,cy=60,circ=2*Math.PI*r;
+  const s=svgEl(w,w);
+  s.appendChild(el('circle',{cx,cy,r,fill:'none',stroke:cssv('--grid'),'stroke-width':11}));
+  s.appendChild(el('circle',{cx,cy,r,fill:'none',stroke:cssv(color),'stroke-width':11,'stroke-linecap':'round',
+    'stroke-dasharray':`${circ*score/100} ${circ}`,transform:`rotate(-90 ${cx} ${cy})`}));
+  s.appendChild(el('text',{x:cx,y:cy+2,'text-anchor':'middle',fill:cssv('--text'),'font-size':30,'font-weight':650},String(score)));
+  s.appendChild(el('text',{x:cx,y:cy+20,'text-anchor':'middle',fill:cssv('--muted'),'font-size':11},'readiness'));
+  return s;
+}
+
+// ---------- render ----------
+function card(title,sub,node){
+  return el('div',{class:'card'},[
+    title&&el('div',{class:'chart-title',text:title}),
+    sub&&el('div',{class:'chart-sub',text:sub}),
+    node
+  ].filter(Boolean));
+}
+function legend(items){return el('div',{class:'legend'},items.map(it=>
+  el('span',{},[el('i',{class:it.line?'line':'',style:`background:${cssv(it.color)}`}),it.label])));}
+
+function render(d){
+  $('#stamp').textContent = `updated ${d.generated_at.replace('T',' ')} · ${d.milestones.weeks_to_race} wks to race`;
+  const app=$('#app'); app.innerHTML='';
+  const R=d.readiness, M=d.milestones, W=d.weekly;
+  const rc = R.score>=75?'--good':R.score>=55?'--warning':'--critical';
+
+  // Readiness hero
+  app.appendChild(el('section',{},[
+    el('div',{class:'card hero'},[
+      el('div',{class:'ring'},ring(R.score,rc)),
+      el('div',{class:'body'},[
+        el('div',{class:'label',text:R.label}),
+        el('div',{class:'verdict',text:R.verdict}),
+        el('ul',{class:'reasons'},R.reasons.map(x=>el('li',{text:x})))
+      ])
+    ])
+  ]));
+
+  // Milestone tiles
+  const tiles=[
+    ['Weeks to race',M.weeks_to_race,'Nov 7 half'],
+    ['Plan week',`${M.current_week}<small>/20</small>`,`${M.consistency_pct}% workouts done`],
+    ['Total miles',M.total_miles,`${M.total_runs} runs logged`],
+    ['Longest run',`${M.longest_run_mi}<small>mi</small>`,'building endurance'],
+    ['VO₂max',(M.vo2max!=null?M.vo2max:'–'), M.vo2max_change>0?`<span class="up">▲ +${M.vo2max_change}</span> recent`:(M.vo2max_change!=null?`${M.vo2max_change} recent`:'')],
+    ['This week',`${W.actual_miles}<small>/${W.planned_miles} mi</small>`,`${W.runs_done}/${W.runs_planned} runs`],
+  ];
+  app.appendChild(el('section',{},[
+    el('h2',{text:'Milestones'}),
+    el('div',{class:'grid tiles'},tiles.map(([k,v,dd])=>el('div',{class:'card tile'},[
+      el('div',{class:'k',text:k}), el('div',{class:'v',html:String(v)}), el('div',{class:'d',html:dd||''})
+    ])))
+  ]));
+
+  // Adjustments
+  app.appendChild(el('section',{},[
+    el('h2',{text:'Plan adjustments'}),
+    el('div',{class:'stack'},d.adjustments.map(a=>el('div',{class:`note ${a.severity}`},[
+      el('span',{class:'tag',text:a.severity==='high'?'Action':a.severity==='med'?'Heads up':'Note'}),
+      el('div',{text:a.text})
+    ])))
+  ]));
+
+  // Tips
+  app.appendChild(el('section',{},[
+    el('h2',{text:'Coaching tips'}),
+    el('div',{class:'stack'},d.tips.map(t=>el('div',{class:`note ${t.kind}`},[
+      el('span',{class:'tag',text:t.kind}), el('div',{text:t.text})
+    ])))
+  ]));
+
+  // Charts
+  const charts=el('section',{},[el('h2',{text:'Trends'})]);
+  const cg=el('div',{class:'grid',style:'gap:14px'});
+
+  // weekly mileage
+  const wk=card('Weekly mileage: planned vs actual','Filled = your actual runs, gray = plan target',
+    el('div',{class:'scroll'},groupedBars(d.series.weekly,{w:Math.max(680,d.series.weekly.length*32)})));
+  wk.appendChild(legend([{color:'--baseline',label:'planned'},{color:'--blue',label:'actual'}]));
+  cg.appendChild(wk);
+
+  // resting HR
+  const rhr=card('Resting heart rate','Lower & stable = recovered. Dashed line is your baseline.',
+    el('div',{class:'scroll'},lineChart(d.series.recovery,{yKey:'resting_hr',color:'#004f46',baseline:M_baseline(d),unit:' bpm',
+      tipHtml:d=>`<b>${fmtDate(d.date)} · resting HR</b>${d.resting_hr} bpm${d.sleep_score?` · sleep ${d.sleep_score}`:''}`})));
+  cg.appendChild(rhr);
+
+  // sleep hours
+  const slp=card('Sleep duration','Nightly hours. Dashed line = 7.5h feel-good target.',
+    el('div',{class:'scroll'},barChart(d.series.recovery,{yKey:'sleep_hours',color:'--green',target:7.5,unit:'h',
+      tipHtml:d=>`<b>${fmtDate(d.date)} · sleep</b>${d.sleep_hours} h${d.sleep_score?` · score ${d.sleep_score}`:''}`})));
+  cg.appendChild(slp);
+
+  // run avg HR with zones + intended effort coloring
+  const eb=d.series.easy_band;
+  const runHR=card('Effort per run: easy vs moderate HR',
+    `Each dot is a run, colored by how it was meant to feel. Green band is your easy range (~${eb.lo}-${eb.hi} bpm, median ${eb.median}); upper band is tempo effort.`,
+    el('div',{class:'scroll'},lineChart(d.series.runs,
+      {yKey:'avg_hr',unit:' bpm',
+       ptColor:r=>r.intent==='hard'?'--red':'--blue',
+       tipHtml:r=>`<b>${fmtDate(r.date)} · ${r.planned_type||'run'}</b>${r.miles} mi · avg ${r.avg_hr} bpm · max ${r.max_hr||'–'} bpm`,
+       bands:[{lo:eb.lo,hi:eb.hi,color:'--green',label:`Easy · talk test (~${eb.lo}-${eb.hi})`},
+              {lo:166,hi:178,color:'--orange',label:'Moderate · tempo effort (few words, 165-175)'}],
+       refs:[{y:eb.median,color:'--blue',label:`easy median ${eb.median}`}]})));
+  runHR.appendChild(legend([{color:'--blue',label:'easy · long · strides'},{color:'--red',label:'tempo · interval'}]));
+  cg.appendChild(runHR);
+
+  charts.appendChild(cg);
+  app.appendChild(charts);
+
+  // Full schedule from the plan start (6/22), grouped by week
+  SCHED=d.plan.slice().sort((a,b)=>a.date<b.date?-1:1);
+  const tbody=el('tbody',{});
+  let curWk=null;
+  SCHED.forEach((w,i)=>{
+    if(w.week!==curWk){curWk=w.week;
+      tbody.appendChild(el('tr',{class:'wkrow'},el('td',{colspan:'6',text:`Week ${w.week}`})));}
+    const c=effortColor(w.type);
+    const tr=el('tr',{},[
+      el('td',{},[w.date.slice(5), w.moved_to?el('span',{class:'moved',text:`→ ${w.moved_to.slice(5)}`}):null]),
+      el('td',{text:w.weekday}),
+      el('td',{},el('span',{class:'wt',style:`background:${cssv(c)};color:${c==='--red'?'#fff':'#2a1c0e'}`,text:w.type})),
+      el('td',{class:'num',text:w.planned_miles?`${w.planned_miles} mi`:'–'}),
+      el('td',{class:'num',text:w.actual?`${w.actual.distance_mi} mi · ${w.actual.avg_hr||'–'}bpm`:'–'}),
+      el('td',{},[el('span',{class:`pill ${w.status}`,text:w.status}),' ',el('span',{class:'chev',text:'›'})]),
+    ]);
+    tr.addEventListener('click',()=>openDetail(i));tbody.appendChild(tr);});
+  const tbl=el('table',{},[
+    el('thead',{},el('tr',{},['Date','Day','Workout','Plan','Actual','Status'].map(h=>el('th',{text:h,class:h==='Plan'||h==='Actual'?'num':''})))),
+    tbody]);
+  app.appendChild(el('section',{},[el('h2',{text:'Schedule'}),card(null,null,el('div',{class:'scroll'},tbl))]));
+}
+function M_baseline(d){return d.readiness.baseline_rhr;}
+
+// ---------- workout detail modal ----------
+function warmup(type){
+  const dyn='Dynamic drills: leg swings (front/back + side), high knees, butt kicks, 10 each.';
+  if(type==='shakeout'||type==='easy') return ['Start at a walk for 2-3 min, then ease into a relaxed jog.','No formal warmup needed. Let the first mile be the warmup.'];
+  if(type==='long') return ['5 min brisk walk or very easy jog to loosen up.','A few leg swings if the legs feel stiff.','Settle straight into easy, conversational pace.'];
+  if(type==='quality') return ['10 min easy jog.',dyn,'Then run the strides as prescribed (relaxed accelerations, full walk recovery).'];
+  if(type==='tempo') return ['10-15 min easy jog to warm up properly.',dyn,'4 x 20-sec strides to prime the legs.','Then begin the tempo portion.'];
+  if(type==='race') return ['10 min easy jog, building slightly toward the end.',dyn,'3-4 short strides.','Then to the start line. Go out easy, even effort.'];
+  return ['Ease in with a few easy minutes before picking up effort.'];
+}
+function openDetail(i){
+  schedIdx=Math.max(0,Math.min(SCHED.length-1,i));
+  const w=SCHED[schedIdx];
+  const sheet=$('#sheet'); sheet.innerHTML='';
+  const x=el('button',{class:'closex',html:'&times;'}); x.addEventListener('click',closeDetail);
+  sheet.appendChild(x);
+  sheet.appendChild(el('div',{class:'grab'}));
+  // prev / next navigation through the schedule
+  const mkNav=(label,delta,disabled)=>{const b=el('button',{class:'navbtn',html:label});
+    if(disabled)b.setAttribute('disabled','');
+    else b.addEventListener('click',e=>{e.stopPropagation();openDetail(schedIdx+delta);});return b;};
+  sheet.appendChild(el('div',{class:'navrow'},[
+    mkNav('‹ Prev',-1,schedIdx<=0),
+    el('span',{class:'navpos',text:`${schedIdx+1} / ${SCHED.length}`}),
+    mkNav('Next ›',1,schedIdx>=SCHED.length-1)]));
+  const mi=w.planned_miles?`${w.planned_miles} mi · `:'';
+  sheet.appendChild(el('h3',{text:w.summary||`${w.type} run`}));
+  sheet.appendChild(el('div',{class:'meta',text:`Week ${w.week} · ${w.date} (${w.weekday}) · ${mi}${w.type}${w.moved_to?` · moved to ${w.moved_to}`:''}`}));
+
+  if(w.actual){
+    const a=w.actual;
+    const stats=[['Distance',`${a.distance_mi} mi`],['Time',`${a.duration_min} min`],
+        ['Avg HR',`${a.avg_hr||'–'} bpm`],['Max HR',`${a.max_hr||'–'} bpm`],
+        ['Pace',a.avg_pace_min_per_mi?`${a.avg_pace_min_per_mi} /mi`:'–']];
+    if(a.avg_cadence) stats.push(['Cadence',`${Math.round(a.avg_cadence)} spm`]);
+    if(a.vo2max) stats.push(['VO₂max',`${a.vo2max}`]);
+    sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'How it went'}),
+      el('div',{class:'statrow'},stats.map(([k,v])=>el('div',{class:'s'},[el('div',{class:'k',text:k}),el('div',{class:'v',text:v})])))]));
+
+    // coaching evaluation of the completed run
+    if(w.evaluation){const ev=w.evaluation;
+      sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Evaluation'}),
+        el('div',{class:`eval ${ev.rating}`},[
+          el('div',{class:'eval-h',text:ev.headline}),
+          el('ul',{class:'eval-pts'},ev.points.map(p=>el('li',{text:p})))
+        ])]));
+    }
+
+    // the note you wrote on the Garmin activity
+    if(a.notes) sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Your Garmin note'}),
+      el('div',{class:'warm'},el('div',{class:'txt',text:a.notes}))]));
+  }
+
+  sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Warmup routine'}),
+    el('div',{class:'warm'},el('ol',{},warmup(w.type).map(x=>el('li',{text:x}))))]));
+
+  if(w.description) sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Workout & notes'}),
+    el('div',{class:'txt',text:w.description})]));
+
+  $('#overlay').classList.add('open');
+}
+function closeDetail(){$('#overlay').classList.remove('open');}
+$('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeDetail();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeDetail();return;}
+  if(!$('#overlay').classList.contains('open'))return;
+  if(e.key==='ArrowLeft'&&schedIdx>0)openDetail(schedIdx-1);
+  if(e.key==='ArrowRight'&&schedIdx<SCHED.length-1)openDetail(schedIdx+1);
+});
+document.addEventListener('pointerdown',()=>{$('#tip').style.display='none';});
+
+// ---------- boot ----------
+async function load(){
+  try{
+    const r=await fetch('/api/dashboard'); if(!r.ok)throw new Error(r.status);
+    render(await r.json());
+  }catch(e){ $('#app').innerHTML=`<div class="err">Couldn't load data (${e.message}).<br>Is the server running & Garmin synced?</div>`; }
+}
+$('#refresh').addEventListener('click',async()=>{
+  const b=$('#refresh'); b.textContent='Syncing…'; b.disabled=true;
+  try{ await fetch('/api/refresh',{method:'POST'}); }catch(e){}
+  setTimeout(async()=>{ await load(); b.textContent='↻ Sync Garmin'; b.disabled=false; }, 9000);
+});
+load();
+</script>
+</body>
+</html>

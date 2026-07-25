@@ -1,0 +1,15 @@
+[Unit]
+Description=RunCoach dashboard (FastAPI/uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=%h/runcoach
+# Point at your training plan .ics (defaults to ./plan.ics if unset)
+Environment=RUNCOACH_ICS=%h/runcoach/plan.ics
+ExecStart=%h/runcoach/venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8000 --log-level warning
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

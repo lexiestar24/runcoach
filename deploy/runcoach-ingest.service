@@ -1,0 +1,9 @@
+[Unit]
+Description=RunCoach Garmin daily sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/runcoach
+ExecStart=%h/runcoach/venv/bin/python ingest.py --days 3 --activities 30

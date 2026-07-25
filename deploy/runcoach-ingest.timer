@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily Garmin sync for RunCoach
+
+[Timer]
+OnCalendar=*-*-* 06:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
