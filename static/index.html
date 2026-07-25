@@ -78,10 +78,20 @@
   .note.high{border-left-color:var(--critical)} .note.med{border-left-color:var(--warning)}
   .note.low{border-left-color:var(--baseline)}
   /* charts */
+  .winctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 12px}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .segbtn{background:var(--surface);border:none;border-radius:0;padding:7px 13px;font-size:12.5px;box-shadow:none;color:var(--text-2)}
+  .segbtn+.segbtn{border-left:1px solid var(--border)}
+  .segbtn.on{background:var(--surface-2);color:var(--text);font-weight:600}
+  .stepper{display:inline-flex;align-items:center;gap:8px}
+  .stepbtn{padding:6px 11px;font-size:12.5px;border-radius:8px}
+  .stepbtn[disabled]{opacity:.35;pointer-events:none}
+  .winlab{font-size:12px;color:var(--text-2);min-width:118px;text-align:center;font-variant-numeric:tabular-nums}
+  .norange{color:var(--muted);font-size:13px;padding:26px 4px;text-align:center}
   .chart-title{font-size:14px;font-weight:600;margin:0 0 2px}
   .chart-sub{font-size:12px;color:var(--muted);margin:0 0 12px}
   .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  svg{display:block;max-width:100%;height:auto}
+  svg{display:block;max-width:100%;height:auto;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-2)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
@@ -173,19 +183,25 @@ const fmtDate=iso=>{try{return new Date(iso+'T00:00').toLocaleDateString('en-US'
 // shared hover/tap tooltip
 function bindTip(node,html){
   node.style.cursor='pointer';
+  node.style.touchAction='manipulation';
   const show=e=>{const t=$('#tip');t.innerHTML=html;t.style.display='block';
     const r=t.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+14;
     if(x+r.width>window.innerWidth-8)x=e.clientX-r.width-14;
     if(y+r.height>window.innerHeight-8)y=e.clientY-r.height-14;
     t.style.left=Math.max(6,x)+'px';t.style.top=Math.max(6,y)+'px';};
-  node.addEventListener('pointerenter',show);
-  node.addEventListener('pointermove',show);
-  node.addEventListener('pointerleave',()=>{$('#tip').style.display='none';});
+  // mouse: follow hover. touch: tap shows and stays until you tap elsewhere.
+  node.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')show(e);});
+  node.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')show(e);});
+  node.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')$('#tip').style.display='none';});
   node.addEventListener('pointerdown',e=>{e.stopPropagation();show(e);});
+  // stop the long-press text-selection / "search Google" popup on touch
+  node.addEventListener('contextmenu',e=>e.preventDefault());
 }
 
 // schedule rows (ordered) + current index, for prev/next navigation in the detail sheet
 let SCHED=[], schedIdx=0;
+// dashboard data + the trends time-window (default: latest 2 weeks, step by week)
+let DATA=null, winState={all:false, weeks:2, offset:0};
 
 // ---------- chart helpers (inline SVG) ----------
 function svgEl(w,h){return el('svg',{viewBox:`0 0 ${w} ${h}`,width:w,height:h,role:'img'});}
@@ -300,7 +316,76 @@ function card(title,sub,node){
 function legend(items){return el('div',{class:'legend'},items.map(it=>
   el('span',{},[el('i',{class:it.line?'line':'',style:`background:${cssv(it.color)}`}),it.label])));}
 
+// ---------- trends time-window ----------
+function dayShift(iso,n){const d=new Date(iso+'T00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function trendWindow(){
+  const rec=DATA.series.recovery;
+  const minD=rec.length?rec[0].date:null, maxD=rec.length?rec[rec.length-1].date:null;
+  if(winState.all||!rec.length) return {start:minD,end:maxD,atOldest:true,atNewest:true};
+  const end=dayShift(maxD,-winState.offset*7);
+  const start=dayShift(end,-(winState.weeks*7-1));
+  return {start,end,atOldest:start<=minD,atNewest:winState.offset<=0};
+}
+const inWin=(arr,w)=>arr.filter(x=>x.date>=w.start&&x.date<=w.end);
+
+function updateTrends(){
+  const ctl=$('#winctl'), grid=$('#chartgrid'); if(!ctl||!grid)return;
+  const w=trendWindow(), hasV=(a,k)=>a.some(x=>x[k]!=null), empty=t=>el('div',{class:'norange',text:t});
+  // ---- window controls ----
+  ctl.innerHTML='';
+  const seg=el('div',{class:'seg'},[
+    el('button',{class:'segbtn'+(winState.all?'':' on'),text:`${winState.weeks}-week view`}),
+    el('button',{class:'segbtn'+(winState.all?' on':''),text:'All'})]);
+  seg.children[0].addEventListener('click',()=>{winState.all=false;updateTrends();});
+  seg.children[1].addEventListener('click',()=>{winState.all=true;updateTrends();});
+  ctl.appendChild(seg);
+  if(!winState.all){
+    const prev=el('button',{class:'stepbtn',html:'‹ older'});
+    const next=el('button',{class:'stepbtn',html:'newer ›'});
+    if(w.atOldest)prev.setAttribute('disabled','');else prev.addEventListener('click',()=>{winState.offset++;updateTrends();});
+    if(w.atNewest)next.setAttribute('disabled','');else next.addEventListener('click',()=>{winState.offset=Math.max(0,winState.offset-1);updateTrends();});
+    ctl.appendChild(el('div',{class:'stepper'},[prev,el('span',{class:'winlab',text:`${fmtDate(w.start)} – ${fmtDate(w.end)}`}),next]));
+  }
+  // ---- charts ----
+  grid.innerHTML='';
+  const rec=winState.all?DATA.series.recovery:inWin(DATA.series.recovery,w);
+  const runs=winState.all?DATA.series.runs:inWin(DATA.series.runs,w);
+  const eb=DATA.series.easy_band;
+
+  // weekly mileage stays full (it's the whole-plan arc)
+  const wk=card('Weekly mileage: planned vs actual','Filled = actual, gray = plan target',
+    el('div',{class:'scroll'},groupedBars(DATA.series.weekly,{w:Math.max(680,DATA.series.weekly.length*32)})));
+  wk.appendChild(legend([{color:'--baseline',label:'planned'},{color:'--blue',label:'actual'}]));
+  grid.appendChild(wk);
+
+  grid.appendChild(card('Resting heart rate','Lower & stable = recovered. Dashed line is your baseline.',
+    hasV(rec,'resting_hr')
+      ? el('div',{class:'scroll'},lineChart(rec,{yKey:'resting_hr',color:'#004f46',baseline:M_baseline(DATA),unit:' bpm',
+          tipHtml:d=>`<b>${fmtDate(d.date)} · resting HR</b>${d.resting_hr} bpm${d.sleep_score?` · sleep ${d.sleep_score}`:''}`}))
+      : empty('No resting-HR data in this range.')));
+
+  grid.appendChild(card('Sleep duration','Nightly hours. Dashed line = 7.5h feel-good target.',
+    hasV(rec,'sleep_hours')
+      ? el('div',{class:'scroll'},barChart(rec,{yKey:'sleep_hours',color:'--green',target:7.5,unit:'h',
+          tipHtml:d=>`<b>${fmtDate(d.date)} · sleep</b>${d.sleep_hours} h${d.sleep_score?` · score ${d.sleep_score}`:''}`}))
+      : empty('No sleep data in this range.')));
+
+  const runHR=card('Effort per run: easy vs moderate HR',
+    `Each dot is a run, colored by intended effort. Green band is your easy range (~${eb.lo}-${eb.hi} bpm, median ${eb.median}); upper band is tempo.`,
+    hasV(runs,'avg_hr')
+      ? el('div',{class:'scroll'},lineChart(runs,{yKey:'avg_hr',unit:' bpm',
+          ptColor:r=>r.intent==='hard'?'--red':'--blue',
+          tipHtml:r=>`<b>${fmtDate(r.date)} · ${r.planned_type||'run'}</b>${r.miles} mi · avg ${r.avg_hr} bpm · max ${r.max_hr||'–'} bpm`,
+          bands:[{lo:eb.lo,hi:eb.hi,color:'--green',label:`Easy · talk test (~${eb.lo}-${eb.hi})`},
+                 {lo:166,hi:178,color:'--orange',label:'Moderate · tempo (few words, 165-175)'}],
+          refs:[{y:eb.median,color:'--blue',label:`easy median ${eb.median}`}]}))
+      : empty('No runs in this range.'));
+  if(hasV(runs,'avg_hr'))runHR.appendChild(legend([{color:'--blue',label:'easy · long · strides'},{color:'--red',label:'tempo · interval'}]));
+  grid.appendChild(runHR);
+}
+
 function render(d){
+  DATA=d;
   $('#stamp').textContent = `updated ${d.generated_at.replace('T',' ')} · ${d.milestones.weeks_to_race} wks to race`;
   const app=$('#app'); app.innerHTML='';
   const R=d.readiness, M=d.milestones, W=d.weekly;
@@ -351,44 +436,11 @@ function render(d){
     ])))
   ]));
 
-  // Charts
-  const charts=el('section',{},[el('h2',{text:'Trends'})]);
-  const cg=el('div',{class:'grid',style:'gap:14px'});
-
-  // weekly mileage
-  const wk=card('Weekly mileage: planned vs actual','Filled = your actual runs, gray = plan target',
-    el('div',{class:'scroll'},groupedBars(d.series.weekly,{w:Math.max(680,d.series.weekly.length*32)})));
-  wk.appendChild(legend([{color:'--baseline',label:'planned'},{color:'--blue',label:'actual'}]));
-  cg.appendChild(wk);
-
-  // resting HR
-  const rhr=card('Resting heart rate','Lower & stable = recovered. Dashed line is your baseline.',
-    el('div',{class:'scroll'},lineChart(d.series.recovery,{yKey:'resting_hr',color:'#004f46',baseline:M_baseline(d),unit:' bpm',
-      tipHtml:d=>`<b>${fmtDate(d.date)} · resting HR</b>${d.resting_hr} bpm${d.sleep_score?` · sleep ${d.sleep_score}`:''}`})));
-  cg.appendChild(rhr);
-
-  // sleep hours
-  const slp=card('Sleep duration','Nightly hours. Dashed line = 7.5h feel-good target.',
-    el('div',{class:'scroll'},barChart(d.series.recovery,{yKey:'sleep_hours',color:'--green',target:7.5,unit:'h',
-      tipHtml:d=>`<b>${fmtDate(d.date)} · sleep</b>${d.sleep_hours} h${d.sleep_score?` · score ${d.sleep_score}`:''}`})));
-  cg.appendChild(slp);
-
-  // run avg HR with zones + intended effort coloring
-  const eb=d.series.easy_band;
-  const runHR=card('Effort per run: easy vs moderate HR',
-    `Each dot is a run, colored by how it was meant to feel. Green band is your easy range (~${eb.lo}-${eb.hi} bpm, median ${eb.median}); upper band is tempo effort.`,
-    el('div',{class:'scroll'},lineChart(d.series.runs,
-      {yKey:'avg_hr',unit:' bpm',
-       ptColor:r=>r.intent==='hard'?'--red':'--blue',
-       tipHtml:r=>`<b>${fmtDate(r.date)} · ${r.planned_type||'run'}</b>${r.miles} mi · avg ${r.avg_hr} bpm · max ${r.max_hr||'–'} bpm`,
-       bands:[{lo:eb.lo,hi:eb.hi,color:'--green',label:`Easy · talk test (~${eb.lo}-${eb.hi})`},
-              {lo:166,hi:178,color:'--orange',label:'Moderate · tempo effort (few words, 165-175)'}],
-       refs:[{y:eb.median,color:'--blue',label:`easy median ${eb.median}`}]})));
-  runHR.appendChild(legend([{color:'--blue',label:'easy · long · strides'},{color:'--red',label:'tempo · interval'}]));
-  cg.appendChild(runHR);
-
-  charts.appendChild(cg);
-  app.appendChild(charts);
+  // Charts (with a week-window pager; see updateTrends)
+  app.appendChild(el('section',{},[el('h2',{text:'Trends'}),
+    el('div',{class:'winctl',id:'winctl'}),
+    el('div',{class:'grid',id:'chartgrid',style:'gap:14px'})]));
+  updateTrends();
 
   // Full schedule from the plan start (6/22), grouped by week
   SCHED=d.plan.slice().sort((a,b)=>a.date<b.date?-1:1);
