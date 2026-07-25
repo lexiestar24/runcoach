@@ -249,10 +249,16 @@ function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],basel
   if(line){const dpath=pts.map((d,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(d[yKey]).toFixed(1)}`).join(' ');
     s.appendChild(el('path',{d:dpath,fill:'none',stroke:cssv(ptColor?'--baseline':color),'stroke-width':ptColor?1.5:2,'stroke-linejoin':'round','stroke-linecap':'round',opacity:ptColor?.7:1}));}
   pts.forEach((d,i)=>{const col=ptColor?ptColor(d):color;
-    const c=el('circle',{cx:X(i),cy:Y(d[yKey]),r:ptColor?4.5:3.6,fill:ptColor?cssv(col):cssv('--surface'),stroke:cssv(col),'stroke-width':2});
-    bindTip(c, tipHtml?tipHtml(d):`<b>${fmtDate(d.date)}</b>${fmt(d[yKey])}${unit}`);s.appendChild(c);});
+    const c=el('circle',{cx:X(i),cy:Y(d[yKey]),r:ptColor?5:4,fill:ptColor?cssv(col):cssv('--surface'),stroke:cssv(col),'stroke-width':2});
+    s.appendChild(c);});
   [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:X(i),y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':10},pts[i].date.slice(5)));});
   labels.forEach(l=>s.appendChild(l));  // labels on top
+  // big invisible tap targets: full-height column per point, so a tap anywhere near a point selects it
+  const spacing=pts.length>1?iw/(pts.length-1):iw;
+  pts.forEach((d,i)=>{let hx=X(i)-spacing/2,hw=spacing;
+    if(hx<pad.l){hw-=pad.l-hx;hx=pad.l;} if(hx+hw>pad.l+iw)hw=pad.l+iw-hx;
+    const hit=el('rect',{x:hx,y:pad.t,width:Math.max(1,hw),height:ih,fill:'transparent','pointer-events':'all'});
+    bindTip(hit, tipHtml?tipHtml(d):`<b>${fmtDate(d.date)}</b>${fmt(d[yKey])}${unit}`);s.appendChild(hit);});
   return s;
 }
 
@@ -288,10 +294,13 @@ function barChart(data,{yKey,w=680,h=200,color='--blue',target=null,unit='',tipH
     s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':10},v.toFixed(0)));}
   pts.forEach((d,i)=>{const y=Y(d[yKey]),x=pad.l+bw*i+bw*0.15;
     const r=el('rect',{x,y,width:bw*0.7,height:Math.max(0,pad.t+ih-y),rx:3,fill:cssv(color)});
-    bindTip(r, tipHtml?tipHtml(d):`<b>${fmtDate(d.date)}</b>${d[yKey]}${unit}`);s.appendChild(r);});
+    s.appendChild(r);});
   if(target!=null){const y=Y(target);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
     s.appendChild(el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv('--muted'),'font-size':10},tlab));}
   [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:pad.l+bw*i+bw/2,y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':10},pts[i].date.slice(5)));});
+  // full-height tap targets per bar
+  pts.forEach((d,i)=>{const hit=el('rect',{x:pad.l+bw*i,y:pad.t,width:bw,height:ih,fill:'transparent','pointer-events':'all'});
+    bindTip(hit, tipHtml?tipHtml(d):`<b>${fmtDate(d.date)}</b>${d[yKey]}${unit}`);s.appendChild(hit);});
   return s;
 }
 
