@@ -371,7 +371,7 @@ function updateTrends(){
 
   grid.appendChild(card('Resting heart rate','Lower & stable = recovered. Dashed line is your baseline.',
     hasV(rec,'resting_hr')
-      ? el('div',{class:'scroll'},lineChart(rec,{yKey:'resting_hr',color:'#004f46',baseline:M_baseline(DATA),unit:' bpm',
+      ? el('div',{class:'scroll'},lineChart(rec,{yKey:'resting_hr',color:'#ae5225',baseline:M_baseline(DATA),unit:' bpm',
           tipHtml:d=>`<b>${fmtDate(d.date)} · resting HR</b>${d.resting_hr} bpm${d.sleep_score?` · sleep ${d.sleep_score}`:''}`}))
       : empty('No resting-HR data in this range.')));
 
@@ -386,7 +386,7 @@ function updateTrends(){
     hasV(runs,'avg_hr')
       ? el('div',{class:'scroll'},lineChart(runs,{yKey:'avg_hr',unit:' bpm',
           ptColor:r=>r.intent==='hard'?'--red':'--blue',
-          tipHtml:r=>`<b>${fmtDate(r.date)} · ${r.planned_type||'run'}</b>${r.miles} mi · avg ${r.avg_hr} bpm · max ${r.max_hr||'–'} bpm`,
+          tipHtml:r=>`<b style="color:${cssv(r.intent==='hard'?'--red':'--blue')}">${fmtDate(r.date)} · ${r.planned_type||'run'}</b>${r.miles} mi · avg ${r.avg_hr} bpm · max ${r.max_hr||'–'} bpm`,
           bands:[{lo:eb.lo,hi:eb.hi,color:'--green',label:`Easy · talk test (~${eb.lo}-${eb.hi})`},
                  {lo:166,hi:178,color:'--orange',label:'Moderate · tempo (few words, 165-175)'}],
           refs:[{y:eb.median,color:'--blue',label:`easy median ${eb.median}`}]}))
