@@ -40,7 +40,8 @@ pip install -r requirements.txt
 python -c "from garminconnect import Garmin; import getpass; \
   g=Garmin(input('email: '), getpass.getpass()); g.login(); g.garth.dump('~/.garminconnect')"
 
-# Point at your plan's .ics (or set RUNCOACH_ICS)
+# A small sample plan.ics is included so it runs out of the box.
+# To use your own, point RUNCOACH_ICS at it:
 export RUNCOACH_ICS=/path/to/your-plan.ics
 
 python ingest.py --days 45 --activities 50   # backfill history

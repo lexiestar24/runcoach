@@ -1,0 +1,48 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//RunCoach//Sample Plan//EN
+CALSCALE:GREGORIAN
+X-WR-CALNAME:RunCoach Sample Half-Marathon Plan
+BEGIN:VEVENT
+UID:wk1-mon@runcoach-sample
+DTSTART:20260622T173000
+DTEND:20260622T180000
+SUMMARY:Wk1 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational.\n\nEffort guide: EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175).
+END:VEVENT
+BEGIN:VEVENT
+UID:wk1-thu@runcoach-sample
+DTSTART:20260625T173000
+DTEND:20260625T181500
+SUMMARY:Wk1 Thu - 2.5 mi easy + strides
+DESCRIPTION:2.5 miles easy + 4 strides at the end. Strides = 4 x 20-sec relaxed accelerations\, walk to recover between each.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+END:VEVENT
+BEGIN:VEVENT
+UID:wk1-sat@runcoach-sample
+DTSTART:20260627T090000
+DTEND:20260627T093000
+SUMMARY:Wk1 Sat - 3 mi long run
+DESCRIPTION:3 mile long run at an easy\, even effort. Walk breaks are fine.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+END:VEVENT
+BEGIN:VEVENT
+UID:wk2-mon@runcoach-sample
+DTSTART:20260629T173000
+DTEND:20260629T180000
+SUMMARY:Wk2 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+END:VEVENT
+BEGIN:VEVENT
+UID:wk2-thu@runcoach-sample
+DTSTART:20260702T173000
+DTEND:20260702T181500
+SUMMARY:Wk2 Thu - 3.5 mi tempo
+DESCRIPTION:3.5 miles: 1 mi easy warm-up\, then 1.5 mi comfortably-hard (tempo)\, then 1 mi easy cool-down.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+END:VEVENT
+BEGIN:VEVENT
+UID:wk2-sat@runcoach-sample
+DTSTART:20260704T090000
+DTEND:20260704T093000
+SUMMARY:Wk2 Sat - 3.5 mi long run
+DESCRIPTION:3.5 mile long run\, easy even effort.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+END:VEVENT
+END:VCALENDAR
