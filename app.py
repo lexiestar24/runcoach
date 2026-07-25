@@ -2,6 +2,9 @@
 import os
 import threading
 import datetime as dt
+import mimetypes
+
+mimetypes.add_type("application/manifest+json", ".webmanifest")  # PWA manifest
 
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, FileResponse
