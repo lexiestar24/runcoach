@@ -82,6 +82,11 @@ def init_db():
     cols = {r[1] for r in conn.execute("PRAGMA table_info(activities)")}
     if "notes" not in cols:
         conn.execute("ALTER TABLE activities ADD COLUMN notes TEXT")
+    # start GPS, used to look up per-run weather conditions
+    if "start_lat" not in cols:
+        conn.execute("ALTER TABLE activities ADD COLUMN start_lat REAL")
+    if "start_lon" not in cols:
+        conn.execute("ALTER TABLE activities ADD COLUMN start_lon REAL")
     conn.commit()
     conn.close()
 

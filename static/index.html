@@ -133,9 +133,13 @@
   .statrow{display:flex;gap:18px;flex-wrap:wrap;background:var(--surface-2);border-radius:12px;padding:12px 14px}
   .statrow .s .k{font-size:11px;color:var(--muted)} .statrow .s .v{font-size:18px;font-weight:650}
   .eval{background:var(--surface-2);border-radius:12px;padding:12px 14px;border-left:4px solid var(--good)}
-  .eval.short,.eval.easy-for-hard{border-left-color:var(--warning)}
+  .eval.short,.eval.easy-for-hard,.eval.flat{border-left-color:var(--warning)}
   .eval.ran-hot{border-left-color:var(--serious)}
+  .eval.breakthrough,.eval.gutsy{border-left-width:5px}
   .eval-h{font-weight:650;font-size:14.5px;margin-bottom:6px}
+  .eval-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .chip{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;
+    background:var(--surface);border:1px solid var(--border);color:var(--text-2)}
   .eval-pts{margin:0;padding-left:18px} .eval-pts li{font-size:13.5px;line-height:1.5;color:var(--text-2);margin:3px 0}
   .closex{position:sticky;top:0;float:right;background:none;border:none;box-shadow:none;font-size:22px;color:var(--muted);padding:0 4px;cursor:pointer}
   .tip{position:fixed;z-index:60;display:none;pointer-events:none;background:var(--surface-2);
@@ -400,7 +404,7 @@ function render(d){
   $('#stamp').textContent = `updated ${d.generated_at.replace('T',' ')} · ${d.milestones.weeks_to_race} wks to race`;
   const app=$('#app'); app.innerHTML='';
   const R=d.readiness, M=d.milestones, W=d.weekly;
-  const rc = R.score>=75?'--good':R.score>=55?'--warning':'--critical';
+  const rc = R.score>=72?'--good':R.score>=55?'--warning':'--critical';
 
   // Readiness hero
   app.appendChild(el('section',{},[
@@ -518,9 +522,19 @@ function openDetail(i){
 
     // coaching evaluation of the completed run
     if(w.evaluation){const ev=w.evaluation;
+      // at-a-glance chips: where this sat among runs of the same kind, the
+      // weather it was run in, and how recovered she was that morning
+      const chips=[];
+      if(ev.comparison){const c=ev.comparison;
+        chips.push(`#${c.rank} of ${c.n_peers+1} ${c.type} runs`);
+        chips.push(`${c.pct_vs_median>=0?'+':''}${c.pct_vs_median}% vs your median`);}
+      if(ev.conditions) chips.push(ev.conditions.indoor?'treadmill':
+        `${Math.round(ev.conditions.temp_f)}°F, dew ${Math.round(ev.conditions.dew_f)}°`);
+      if(ev.readiness_that_day!=null) chips.push(`readiness ${ev.readiness_that_day}`);
       sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Evaluation'}),
         el('div',{class:`eval ${ev.rating}`},[
           el('div',{class:'eval-h',text:ev.headline}),
+          chips.length?el('div',{class:'eval-meta'},chips.map(t=>el('span',{class:'chip',text:t}))):null,
           el('ul',{class:'eval-pts'},ev.points.map(p=>el('li',{text:p})))
         ])]));
     }

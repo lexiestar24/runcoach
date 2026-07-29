@@ -32,9 +32,10 @@ def dashboard():
             "series": engine.series(conn),
             "plan": planmod.plan_with_actuals(conn),
         }
+        ctx = engine.evaluation_context(conn)
         for w in data["plan"]:
             if w.get("actual"):
-                w["evaluation"] = engine.evaluate(w)
+                w["evaluation"] = engine.evaluate(w, conn=conn, ctx=ctx)
     finally:
         conn.close()
     return JSONResponse(data)

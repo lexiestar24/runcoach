@@ -1,48 +1,1081 @@
 BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//RunCoach//Sample Plan//EN
+PRODID:-//Half Marathon Plan//EN
 CALSCALE:GREGORIAN
-X-WR-CALNAME:RunCoach Sample Half-Marathon Plan
+X-WR-CALNAME:Half Marathon Training
 BEGIN:VEVENT
-UID:wk1-mon@runcoach-sample
+UID:ab545560-0342-4182-901a-7197d5653834@halfmarathon
+DTSTAMP:20260622T212654
 DTSTART:20260622T173000
 DTEND:20260622T180000
 SUMMARY:Wk1 Mon - 1 mi easy shakeout
-DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational.\n\nEffort guide: EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175).
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk1 Mon - 1 mi easy shakeout
+END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:wk1-thu@runcoach-sample
+UID:85c08fb6-1b4e-420b-b6cf-759d00eea321@halfmarathon
+DTSTAMP:20260622T212654
 DTSTART:20260625T173000
 DTEND:20260625T181500
-SUMMARY:Wk1 Thu - 2.5 mi easy + strides
-DESCRIPTION:2.5 miles easy + 4 strides at the end. Strides = 4 x 20-sec relaxed accelerations\, walk to recover between each.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+SUMMARY:Wk1 Thu - 2
+DESCRIPTION:2.5 miles easy + 4 strides at the end. Strides = 4 x 20-sec r
+ elaxed accelerations\, walk to recover between each.\n\nPrehab (2-3x/wee
+ k): slow calf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (
+ side-lying leg raises\, single-leg sit-to-stands\, step-downs). Helps th
+ e Achilles + knee adapt.\n\nEffort guide: EASY = can talk in full senten
+ ces (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time
+  (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk1 Thu - 2
+END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:wk1-sat@runcoach-sample
+UID:35a59d79-1524-4b92-8a89-c4098f4c6599@halfmarathon
+DTSTAMP:20260622T212654
 DTSTART:20260627T090000
-DTEND:20260627T093000
+DTEND:20260627T093900
 SUMMARY:Wk1 Sat - 3 mi long run
-DESCRIPTION:3 mile long run at an easy\, even effort. Walk breaks are fine.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+DESCRIPTION:3 miles EASY\, run/walk (9 min jog / 1 min walk). Keep it ful
+ ly conversational.\n\nWarm up with a few easy minutes first. Effort guid
+ e: EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/T
+ EMPO = only a few words at a time (HR ~165-175). Stop for any sharp or o
+ ne-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk1 Sat - 3 mi long run
+END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:wk2-mon@runcoach-sample
+UID:492bf050-f894-4456-80b2-008d07fc6797@halfmarathon
+DTSTAMP:20260622T212654
 DTSTART:20260629T173000
 DTEND:20260629T180000
 SUMMARY:Wk2 Mon - 1 mi easy shakeout
-DESCRIPTION:1 mile easy shakeout.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk2 Mon - 1 mi easy shakeout
+END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:wk2-thu@runcoach-sample
+UID:015270ec-e427-4ae9-a340-8e285609667c@halfmarathon
+DTSTAMP:20260622T212654
 DTSTART:20260702T173000
 DTEND:20260702T181500
-SUMMARY:Wk2 Thu - 3.5 mi tempo
-DESCRIPTION:3.5 miles: 1 mi easy warm-up\, then 1.5 mi comfortably-hard (tempo)\, then 1 mi easy cool-down.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+SUMMARY:Wk2 Thu - 3 miles easy + 4 strides at the end
+DESCRIPTION:3 miles easy + 4 strides at the end.\n\nPrehab (2-3x/week): s
+ low calf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-
+ lying leg raises\, single-leg sit-to-stands\, step-downs). Helps the Ach
+ illes + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (
+ HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR 
+ ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk2 Thu - 3 miles easy + 4 strides at the end
+END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:wk2-sat@runcoach-sample
+UID:dd2c3b43-336f-4628-b57d-fbda64376aab@halfmarathon
+DTSTAMP:20260622T212654
 DTSTART:20260704T090000
-DTEND:20260704T093000
+DTEND:20260704T094600
 SUMMARY:Wk2 Sat - 3.5 mi long run
-DESCRIPTION:3.5 mile long run\, easy even effort.\n\nEffort guide: EASY = full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = a few words (HR ~165-175).
+DESCRIPTION:3.5 miles EASY\, run/walk (9 min jog / 1 min walk).\n\nWarm u
+ p with a few easy minutes first. Effort guide: EASY = can talk in full s
+ entences (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a
+  time (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk2 Sat - 3.5 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:95363ef5-08d0-4e0c-8b63-fdb44b90c203@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260706T173000
+DTEND:20260706T180000
+SUMMARY:Wk3 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk3 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:a955fbbf-ac72-4cc9-b18b-5eb04a57de2c@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260709T173000
+DTEND:20260709T181500
+SUMMARY:Wk3 Thu - 3 miles easy + 4 strides at the end
+DESCRIPTION:3 miles easy + 4 strides at the end.\n\nPrehab (2-3x/week): s
+ low calf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-
+ lying leg raises\, single-leg sit-to-stands\, step-downs). Helps the Ach
+ illes + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (
+ HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR 
+ ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk3 Thu - 3 miles easy + 4 strides at the end
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:a7876d9b-160a-4c2b-bbc4-b3481bf23407@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260711T090000
+DTEND:20260711T095200
+SUMMARY:Wk3 Sat - 4 mi long run
+DESCRIPTION:4 miles EASY. Run/walk optional if a stretch feels long.\n\nW
+ arm up with a few easy minutes first. Effort guide: EASY = can talk in f
+ ull sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words
+  at a time (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk3 Sat - 4 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:82ae7ca3-8831-44a5-8705-dde7be30f613@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260713T173000
+DTEND:20260713T180000
+SUMMARY:Wk4 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk4 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:fa428ca1-0367-4872-aece-1d08af3e4d73@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260716T173000
+DTEND:20260716T181500
+SUMMARY:Wk4 Thu - 2
+DESCRIPTION:2.5 miles easy (cutback week - go gentle).\n\nPrehab (2-3x/we
+ ek): slow calf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work 
+ (side-lying leg raises\, single-leg sit-to-stands\, step-downs). Helps t
+ he Achilles + knee adapt.\n\nEffort guide: EASY = can talk in full sente
+ nces (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a tim
+ e (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk4 Thu - 2
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:bb664d3d-c916-4743-ad1f-48de52071ba9@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260718T090000
+DTEND:20260718T093900
+SUMMARY:Wk4 Sat - 3 mi long run
+DESCRIPTION:3 miles EASY (cutback week).\n\nWarm up with a few easy minut
+ es first. Effort guide: EASY = can talk in full sentences (HR under ~150
+ ). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). St
+ op for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk4 Sat - 3 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:37c26a1d-587c-4574-bcc3-e7cccd69dadf@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260720T173000
+DTEND:20260720T180000
+SUMMARY:Wk5 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk5 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:1d6cc793-328e-4fdb-9a2a-8532834b958d@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260723T173000
+DTEND:20260723T181500
+SUMMARY:Wk5 Thu - 3
+DESCRIPTION:3.5 miles: 1 mi easy warm-up\, then 1.5 mi comfortably-hard (
+ tempo)\, then 1 mi easy cool-down.\n\nPrehab (2-3x/week): slow calf rais
+ es 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying leg rai
+ ses\, single-leg sit-to-stands\, step-downs). Helps the Achilles + knee 
+ adapt.\n\nEffort guide: EASY = can talk in full sentences (HR under ~150
+ ). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). St
+ op for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk5 Thu - 3
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:383dd0c7-2d6f-405a-b5d9-12dfd9954f4e@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260725T090000
+DTEND:20260725T095800
+SUMMARY:Wk5 Sat - 4.5 mi long run
+DESCRIPTION:4.5 miles EASY.\n\nWarm up with a few easy minutes first. Eff
+ ort guide: EASY = can talk in full sentences (HR under ~150). COMFORTABL
+ Y-HARD/TEMPO = only a few words at a time (HR ~165-175). Stop for any sh
+ arp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk5 Sat - 4.5 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:18a90051-1dfb-491e-a177-e49e2c22fc1e@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260727T173000
+DTEND:20260727T180000
+SUMMARY:Wk6 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk6 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:6fe9255f-cb59-440d-ac93-4afb049424e6@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260730T173000
+DTEND:20260730T181500
+SUMMARY:Wk6 Thu - 3
+DESCRIPTION:3.5 miles: easy warm-up\, then 2 x 0.75 mi comfortably-hard w
+ ith 0.25 mi easy jog between\, then easy cool-down.\n\nPrehab (2-3x/week
+ ): slow calf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (s
+ ide-lying leg raises\, single-leg sit-to-stands\, step-downs). Helps the
+  Achilles + knee adapt.\n\nEffort guide: EASY = can talk in full sentenc
+ es (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time 
+ (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk6 Thu - 3
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:93fc00d3-3bf4-48cd-9011-75869cdb8376@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260801T090000
+DTEND:20260801T100500
+SUMMARY:Wk6 Sat - 5 mi long run
+DESCRIPTION:5 miles EASY.\n\nWarm up with a few easy minutes first. Effor
+ t guide: EASY = can talk in full sentences (HR under ~150). COMFORTABLY-
+ HARD/TEMPO = only a few words at a time (HR ~165-175). Stop for any shar
+ p or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk6 Sat - 5 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:2dd83642-54e1-46a1-99cd-da1a9c7dec26@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260803T173000
+DTEND:20260803T180000
+SUMMARY:Wk7 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk7 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:bdfe8a12-b65d-462f-af6b-3edfe63d458c@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260806T173000
+DTEND:20260806T181500
+SUMMARY:Wk7 Thu - 4 miles: 1 mi easy warm-up\, 2 mi comfort
+DESCRIPTION:4 miles: 1 mi easy warm-up\, 2 mi comfortably-hard (tempo)\, 
+ 1 mi easy cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 12 (3
+  sec up / 3 sec down) + hip/glute work (side-lying leg raises\, single-l
+ eg sit-to-stands\, step-downs). Helps the Achilles + knee adapt.\n\nEffo
+ rt guide: EASY = can talk in full sentences (HR under ~150). COMFORTABLY
+ -HARD/TEMPO = only a few words at a time (HR ~165-175). Stop for any sha
+ rp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk7 Thu - 4 miles: 1 mi easy warm-up\, 2 mi comfort
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:c3d741cc-8ac1-4717-9c94-343e34ddc28d@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260808T090000
+DTEND:20260808T101200
+SUMMARY:Wk7 Sat - 5.5 mi long run
+DESCRIPTION:5.5 miles EASY.\n\nWarm up with a few easy minutes first. Eff
+ ort guide: EASY = can talk in full sentences (HR under ~150). COMFORTABL
+ Y-HARD/TEMPO = only a few words at a time (HR ~165-175). Stop for any sh
+ arp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk7 Sat - 5.5 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:89ca2629-a3dc-4642-aec4-a73d09c49755@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260810T173000
+DTEND:20260810T180000
+SUMMARY:Wk8 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk8 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:212aaaba-268b-442c-acf0-91de284d2bb3@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260813T173000
+DTEND:20260813T181500
+SUMMARY:Wk8 Thu - 3 miles easy + 4 strides (cutback week)
+DESCRIPTION:3 miles easy + 4 strides (cutback week).\n\nPrehab (2-3x/week
+ ): slow calf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (s
+ ide-lying leg raises\, single-leg sit-to-stands\, step-downs). Helps the
+  Achilles + knee adapt.\n\nEffort guide: EASY = can talk in full sentenc
+ es (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time 
+ (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk8 Thu - 3 miles easy + 4 strides (cutback week)
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:430ff06d-86ff-440d-9184-56438ec5f38f@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260815T090000
+DTEND:20260815T095200
+SUMMARY:Wk8 Sat - 4 mi long run
+DESCRIPTION:4 miles EASY (cutback week).\n\nWarm up with a few easy minut
+ es first. Effort guide: EASY = can talk in full sentences (HR under ~150
+ ). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). St
+ op for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk8 Sat - 4 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:3b50e17a-b2ba-4aba-b58a-f4c4a6053945@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260817T173000
+DTEND:20260817T180000
+SUMMARY:Wk9 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk9 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:08589fd1-f009-449f-9042-d4917a4055ea@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260820T173000
+DTEND:20260820T181500
+SUMMARY:Wk9 Thu - 4 miles: 1 mi easy warm-up\, 2
+DESCRIPTION:4 miles: 1 mi easy warm-up\, 2.5 mi comfortably-hard (tempo)\
+ , 0.5 mi easy cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 1
+ 2 (3 sec up / 3 sec down) + hip/glute work (side-lying leg raises\, sing
+ le-leg sit-to-stands\, step-downs). Helps the Achilles + knee adapt.\n\n
+ Effort guide: EASY = can talk in full sentences (HR under ~150). COMFORT
+ ABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). Stop for any
+  sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk9 Thu - 4 miles: 1 mi easy warm-up\, 2
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:e16fe308-11ad-478d-a201-f7b0c2d68160@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260822T090000
+DTEND:20260822T101800
+SUMMARY:Wk9 Sat - 6 mi long run
+DESCRIPTION:6 miles EASY. Start sipping water\; try a few carbs (chews/ge
+ l) around the midpoint.\n\nWarm up with a few easy minutes first. Effort
+  guide: EASY = can talk in full sentences (HR under ~150). COMFORTABLY-H
+ ARD/TEMPO = only a few words at a time (HR ~165-175). Stop for any sharp
+  or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk9 Sat - 6 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:88a147fb-9c98-4477-a15f-0849e5d8bcd1@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260824T173000
+DTEND:20260824T180000
+SUMMARY:Wk10 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk10 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:ba4095b8-2153-4157-bda7-a5c2896bf083@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260827T173000
+DTEND:20260827T181500
+SUMMARY:Wk10 Thu - 4 miles: easy warm-up\, ~2
+DESCRIPTION:4 miles: easy warm-up\, ~2.5 mi comfortably-hard (tempo)\, ea
+ sy cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up
+  / 3 sec down) + hip/glute work (side-lying leg raises\, single-leg sit-
+ to-stands\, step-downs). Helps the Achilles + knee adapt.\n\nEffort guid
+ e: EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/T
+ EMPO = only a few words at a time (HR ~165-175). Stop for any sharp or o
+ ne-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk10 Thu - 4 miles: easy warm-up\, ~2
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:f01b8fe2-fd64-4636-ab84-ef6b74672584@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260829T090000
+DTEND:20260829T102400
+SUMMARY:Wk10 Sat - 6.5 mi long run
+DESCRIPTION:6.5 miles EASY. Water + a few carbs ~halfway.\n\nWarm up with
+  a few easy minutes first. Effort guide: EASY = can talk in full sentenc
+ es (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time 
+ (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk10 Sat - 6.5 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:f8f01803-00d9-4260-9418-dfcceca1aefb@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260831T173000
+DTEND:20260831T180000
+SUMMARY:Wk11 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk11 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:f2319f59-7abb-4087-8264-5e895e140d31@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260903T173000
+DTEND:20260903T181500
+SUMMARY:Wk11 Thu - 4 miles: easy warm-up\, ~3 mi comfortably
+DESCRIPTION:4 miles: easy warm-up\, ~3 mi comfortably-hard (tempo)\, easy
+  cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up /
+  3 sec down) + hip/glute work (side-lying leg raises\, single-leg sit-to
+ -stands\, step-downs). Helps the Achilles + knee adapt.\n\nEffort guide:
+  EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/TEM
+ PO = only a few words at a time (HR ~165-175). Stop for any sharp or one
+ -sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk11 Thu - 4 miles: easy warm-up\, ~3 mi comfortably
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:ec268fd4-a78c-4453-b854-db1c5632391f@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260905T090000
+DTEND:20260905T103800
+SUMMARY:Wk11 Sat - 7.5 mi long run
+DESCRIPTION:7.5 miles EASY. Water + carbs every ~40 min.\n\nWarm up with 
+ a few easy minutes first. Effort guide: EASY = can talk in full sentence
+ s (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (
+ HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk11 Sat - 7.5 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:dee4a333-360d-40a6-afb7-18dea8e2acc9@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260907T173000
+DTEND:20260907T180000
+SUMMARY:Wk12 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk12 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:d64f2602-c9a7-4f86-85a0-7302023e9f4d@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260910T173000
+DTEND:20260910T181500
+SUMMARY:Wk12 Thu - 3 miles easy (cutback week)
+DESCRIPTION:3 miles easy (cutback week).\n\nPrehab (2-3x/week): slow calf
+  raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying le
+ g raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles + 
+ knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR under
+  ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175
+ ). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk12 Thu - 3 miles easy (cutback week)
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:1b6345f7-79aa-480b-b9fd-793be4944200@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260912T090000
+DTEND:20260912T101800
+SUMMARY:Wk12 Sat - 6 mi long run
+DESCRIPTION:6 miles EASY (cutback week).\n\nWarm up with a few easy minut
+ es first. Effort guide: EASY = can talk in full sentences (HR under ~150
+ ). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). St
+ op for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk12 Sat - 6 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:e1a13b1e-fd38-4cd7-b528-5e31c367a87c@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260914T173000
+DTEND:20260914T180000
+SUMMARY:Wk13 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk13 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:531adf6e-4e8e-4ea3-a76f-0066b07e36b4@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260917T173000
+DTEND:20260917T181500
+SUMMARY:Wk13 Thu - 4 miles: easy warm-up\, ~2
+DESCRIPTION:4 miles: easy warm-up\, ~2.5 mi comfortably-hard (tempo)\, ea
+ sy cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up
+  / 3 sec down) + hip/glute work (side-lying leg raises\, single-leg sit-
+ to-stands\, step-downs). Helps the Achilles + knee adapt.\n\nEffort guid
+ e: EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/T
+ EMPO = only a few words at a time (HR ~165-175). Stop for any sharp or o
+ ne-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk13 Thu - 4 miles: easy warm-up\, ~2
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:7d6142de-9e6b-44e6-86b2-6dc9481d2fba@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260919T090000
+DTEND:20260919T104400
+SUMMARY:Wk13 Sat - 8 mi long run
+DESCRIPTION:8 miles EASY. Water + carbs every ~40 min.\n\nWarm up with a 
+ few easy minutes first. Effort guide: EASY = can talk in full sentences 
+ (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR
+  ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk13 Sat - 8 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:97e9848e-bebc-4911-b17a-e040e83116c5@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260921T173000
+DTEND:20260921T180000
+SUMMARY:Wk14 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk14 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:ff6aaa19-b1ec-48a1-848b-601b9cb263b6@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260924T173000
+DTEND:20260924T181500
+SUMMARY:Wk14 Thu - 4 miles: easy warm-up\, ~3 mi comfortably
+DESCRIPTION:4 miles: easy warm-up\, ~3 mi comfortably-hard (tempo)\, easy
+  cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up /
+  3 sec down) + hip/glute work (side-lying leg raises\, single-leg sit-to
+ -stands\, step-downs). Helps the Achilles + knee adapt.\n\nEffort guide:
+  EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/TEM
+ PO = only a few words at a time (HR ~165-175). Stop for any sharp or one
+ -sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk14 Thu - 4 miles: easy warm-up\, ~3 mi comfortably
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:5354a2e0-3a1f-4c93-9d91-422019a6de5a@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260926T090000
+DTEND:20260926T105700
+SUMMARY:Wk14 Sat - 9 mi long run
+DESCRIPTION:9 miles EASY. Practice race-day fueling.\n\nWarm up with a fe
+ w easy minutes first. Effort guide: EASY = can talk in full sentences (H
+ R under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~
+ 165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk14 Sat - 9 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:d8e0ad62-4e98-48fd-989f-f7aab7e847d5@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20260928T173000
+DTEND:20260928T180000
+SUMMARY:Wk15 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk15 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:83b7349e-6322-42a4-9026-2ee5cbaebc6a@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261001T173000
+DTEND:20261001T181500
+SUMMARY:Wk15 Thu - 4 miles: easy warm-up\, ~3 mi comfortably
+DESCRIPTION:4 miles: easy warm-up\, ~3 mi comfortably-hard (tempo)\, easy
+  cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up /
+  3 sec down) + hip/glute work (side-lying leg raises\, single-leg sit-to
+ -stands\, step-downs). Helps the Achilles + knee adapt.\n\nEffort guide:
+  EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/TEM
+ PO = only a few words at a time (HR ~165-175). Stop for any sharp or one
+ -sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk15 Thu - 4 miles: easy warm-up\, ~3 mi comfortably
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:bc67dae8-cdac-42d8-ad85-2b1bacdbc3e6@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261003T090000
+DTEND:20261003T111000
+SUMMARY:Wk15 Sat - 10 mi long run
+DESCRIPTION:10 miles EASY. Practice race-day fueling.\n\nWarm up with a f
+ ew easy minutes first. Effort guide: EASY = can talk in full sentences (
+ HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR 
+ ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk15 Sat - 10 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:fe95a531-efcb-43e8-aab7-ec4f885f76f0@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261005T173000
+DTEND:20261005T180000
+SUMMARY:Wk16 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk16 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:d701934b-9d6c-4d9c-a47d-384d3e6fc82d@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261008T173000
+DTEND:20261008T181500
+SUMMARY:Wk16 Thu - 3
+DESCRIPTION:3.5 miles easy + 4 strides (cutback week).\n\nPrehab (2-3x/we
+ ek): slow calf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work 
+ (side-lying leg raises\, single-leg sit-to-stands\, step-downs). Helps t
+ he Achilles + knee adapt.\n\nEffort guide: EASY = can talk in full sente
+ nces (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a tim
+ e (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk16 Thu - 3
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:06cd1dce-d12f-4cf4-9a5b-27b9470ebe0b@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261010T090000
+DTEND:20261010T103800
+SUMMARY:Wk16 Sat - 7.5 mi long run
+DESCRIPTION:7.5 miles EASY (cutback week).\n\nWarm up with a few easy min
+ utes first. Effort guide: EASY = can talk in full sentences (HR under ~1
+ 50). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). 
+ Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk16 Sat - 7.5 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:9370b85a-de43-4620-b388-3a12e9f85ab4@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261012T173000
+DTEND:20261012T180000
+SUMMARY:Wk17 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk17 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:5940f6ea-82aa-49ee-8162-9dd5eb75fda2@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261015T173000
+DTEND:20261015T181500
+SUMMARY:Wk17 Thu - 4 miles: easy warm-up\, ~3 mi comfortably
+DESCRIPTION:4 miles: easy warm-up\, ~3 mi comfortably-hard (tempo)\, easy
+  cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up /
+  3 sec down) + hip/glute work (side-lying leg raises\, single-leg sit-to
+ -stands\, step-downs). Helps the Achilles + knee adapt.\n\nEffort guide:
+  EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/TEM
+ PO = only a few words at a time (HR ~165-175). Stop for any sharp or one
+ -sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk17 Thu - 4 miles: easy warm-up\, ~3 mi comfortably
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:ddd975ea-d1f4-48c4-b920-f2d6258c77fc@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261017T090000
+DTEND:20261017T112300
+SUMMARY:Wk17 Sat - 11 mi long run
+DESCRIPTION:11 miles EASY. Dial in fueling + hydration.\n\nWarm up with a
+  few easy minutes first. Effort guide: EASY = can talk in full sentences
+  (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (H
+ R ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk17 Sat - 11 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:fe53572c-8420-4a47-a352-d186a6c6a45c@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261019T173000
+DTEND:20261019T180000
+SUMMARY:Wk18 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk18 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:647db4c9-0618-475a-83a3-ad741ca9b207@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261022T173000
+DTEND:20261022T181500
+SUMMARY:Wk18 Thu - 4 miles: easy warm-up\, ~2
+DESCRIPTION:4 miles: easy warm-up\, ~2.5 mi comfortably-hard (tempo)\, ea
+ sy cool-down.\n\nPrehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up
+  / 3 sec down) + hip/glute work (side-lying leg raises\, single-leg sit-
+ to-stands\, step-downs). Helps the Achilles + knee adapt.\n\nEffort guid
+ e: EASY = can talk in full sentences (HR under ~150). COMFORTABLY-HARD/T
+ EMPO = only a few words at a time (HR ~165-175). Stop for any sharp or o
+ ne-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk18 Thu - 4 miles: easy warm-up\, ~2
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:92c7412e-de75-4e6d-97f8-8fb3c638c5b3@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261024T090000
+DTEND:20261024T113600
+SUMMARY:Wk18 Sat - 12 mi long run
+DESCRIPTION:12 miles EASY - peak long run!\n\nWarm up with a few easy min
+ utes first. Effort guide: EASY = can talk in full sentences (HR under ~1
+ 50). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). 
+ Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk18 Sat - 12 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:ac02dd1c-07dd-46ba-b386-b145abedc597@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261026T173000
+DTEND:20261026T180000
+SUMMARY:Wk19 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk19 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:94b4cb38-a872-4291-a7e2-233b283576db@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261029T173000
+DTEND:20261029T181500
+SUMMARY:Wk19 Thu - 3
+DESCRIPTION:3.5 miles easy + a few strides (taper week - stay fresh).\n\n
+ Prehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up / 3 sec down) + 
+ hip/glute work (side-lying leg raises\, single-leg sit-to-stands\, step-
+ downs). Helps the Achilles + knee adapt.\n\nEffort guide: EASY = can tal
+ k in full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few
+  words at a time (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk19 Thu - 3
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:0293da91-b467-4090-a2e6-00425f48dde9@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261031T090000
+DTEND:20261031T104400
+SUMMARY:Wk19 Sat - 8 mi long run
+DESCRIPTION:8 miles EASY (taper).\n\nWarm up with a few easy minutes firs
+ t. Effort guide: EASY = can talk in full sentences (HR under ~150). COMF
+ ORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). Stop for 
+ any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk19 Sat - 8 mi long run
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:53bb2dea-27f4-4d3a-9da9-eb272b74355a@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261102T173000
+DTEND:20261102T180000
+SUMMARY:Wk20 Mon - 1 mi easy shakeout
+DESCRIPTION:1 mile easy shakeout - loosen the legs\, fully conversational
+ . Optional\; skip if the legs are beat up.\n\nPrehab (2-3x/week): slow c
+ alf raises 2-3 x 12 (3 sec up / 3 sec down) + hip/glute work (side-lying
+  leg raises\, single-leg sit-to-stands\, step-downs). Helps the Achilles
+  + knee adapt.\n\nEffort guide: EASY = can talk in full sentences (HR un
+ der ~150). COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-
+ 175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk20 Mon - 1 mi easy shakeout
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:c9cc4a24-499f-4d1e-8854-ac242e5935b9@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261105T173000
+DTEND:20261105T181500
+SUMMARY:Wk20 Thu - 2 miles easy + 4 strides (race week - li
+DESCRIPTION:2 miles easy + 4 strides (race week - light and relaxed).\n\n
+ Prehab (2-3x/week): slow calf raises 2-3 x 12 (3 sec up / 3 sec down) + 
+ hip/glute work (side-lying leg raises\, single-leg sit-to-stands\, step-
+ downs). Helps the Achilles + knee adapt.\n\nEffort guide: EASY = can tal
+ k in full sentences (HR under ~150). COMFORTABLY-HARD/TEMPO = only a few
+  words at a time (HR ~165-175). Stop for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk20 Thu - 2 miles easy + 4 strides (race week - li
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:d2f18a94-9ef3-4d76-a160-8683c92ca0c4@halfmarathon
+DTSTAMP:20260622T212654
+DTSTART:20261107T090000
+DTEND:20261107T115000
+SUMMARY:Wk20 Sat - HALF MARATHON 13.1 mi
+DESCRIPTION:HALF MARATHON - 13.1 miles! Easy\, even effort\, fuel every ~
+ 40 min\, run/walk anytime. Enjoy it.\n\nWarm up with a few easy minutes 
+ first. Effort guide: EASY = can talk in full sentences (HR under ~150). 
+ COMFORTABLY-HARD/TEMPO = only a few words at a time (HR ~165-175). Stop 
+ for any sharp or one-sided pain.
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Wk20 Sat - HALF MARATHON 13.1 mi
+END:VALARM
 END:VEVENT
 END:VCALENDAR

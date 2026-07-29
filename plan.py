@@ -51,6 +51,30 @@ def _planned_miles(summary, desc):
     return None
 
 
+_TYPE_LABEL = {
+    "shakeout": "easy shakeout", "long": "long run", "tempo": "tempo",
+    "interval": "intervals", "quality": "easy + strides", "easy": "easy run",
+    "race": "HALF MARATHON",
+}
+
+
+def _repair_summary(summary, wtype, miles):
+    """Rebuild summaries the plan generator truncated at a decimal point.
+
+    The source .ics cuts several SUMMARY lines mid-number ("Wk5 Thu - 3" for
+    what is really a 3.5 mi tempo). The DESCRIPTION is intact, so distance and
+    type are already parsed correctly from there -- this only restores the
+    human-readable label. Untruncated summaries are returned unchanged.
+    """
+    # A complete summary ends in a word ("tempo", "long run", "13.1 mi").
+    # Ending on a bare digit means the generator cut it mid-number.
+    if miles is None or not re.search(r"\d\s*$", summary):
+        return summary
+    m = re.match(r"^\s*(Wk\s*\d+\s+\w{3})", summary)
+    head = m.group(1) if m else summary.split("-")[0].strip()
+    return f"{head} - {miles:g} mi {_TYPE_LABEL.get(wtype, wtype)}"
+
+
 def load_plan():
     """Return a list of workout dicts sorted by date."""
     with open(ICS_PATH, "r", encoding="utf-8") as f:
@@ -75,14 +99,16 @@ def load_plan():
         except ValueError:
             continue
         wk = re.search(r"[Ww]k\s*(\d+)", summary)
+        wtype = _classify(summary, desc)
+        miles = _planned_miles(summary, desc)
         workouts.append({
             "date": date.isoformat(),
             "weekday": date.strftime("%a"),
             "week": int(wk.group(1)) if wk else None,
-            "summary": summary,
+            "summary": _repair_summary(summary, wtype, miles),
             "description": desc,
-            "type": _classify(summary, desc),
-            "planned_miles": _planned_miles(summary, desc),
+            "type": wtype,
+            "planned_miles": miles,
         })
     workouts.sort(key=lambda w: w["date"])
     return workouts
@@ -115,6 +141,10 @@ def plan_with_actuals(conn):
         if actual:
             keys = actual.keys()
             item["actual"] = {
+                "activity_id": actual["activity_id"],
+                "date": actual["date"],
+                "distance_m": actual["distance_m"],
+                "duration_s": actual["duration_s"],
                 "distance_mi": round((actual["distance_m"] or 0) / MILE_M, 2),
                 "duration_min": round((actual["duration_s"] or 0) / 60, 1),
                 "avg_hr": actual["avg_hr"],

@@ -89,12 +89,13 @@ def upsert_activity(conn, a):
     conn.execute(
         """INSERT INTO activities (activity_id, start_local, date, type, name, distance_m, duration_s,
                 moving_s, avg_hr, max_hr, avg_pace_s_per_km, calories, avg_cadence, elevation_gain, vo2max,
-                hr_z1_s, hr_z2_s, hr_z3_s, hr_z4_s, hr_z5_s, notes, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
+                hr_z1_s, hr_z2_s, hr_z3_s, hr_z4_s, hr_z5_s, notes, start_lat, start_lon, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
            ON CONFLICT(activity_id) DO UPDATE SET
                 avg_hr=excluded.avg_hr, max_hr=excluded.max_hr, vo2max=excluded.vo2max,
                 distance_m=excluded.distance_m, duration_s=excluded.duration_s,
-                notes=excluded.notes, updated_at=datetime('now')""",
+                notes=excluded.notes, start_lat=excluded.start_lat, start_lon=excluded.start_lon,
+                updated_at=datetime('now')""",
         (
             a.get("activityId"),
             start,
@@ -117,6 +118,8 @@ def upsert_activity(conn, a):
             _num(a.get("hrTimeInZone_4")),
             _num(a.get("hrTimeInZone_5")),
             (a.get("description") or None),
+            _num(a.get("startLatitude")),
+            _num(a.get("startLongitude")),
         ),
     )
 
@@ -150,6 +153,14 @@ def run(days=3, activities_count=30):
         conn.commit()
     except Exception as e:
         print(f"  activities: {e}", file=sys.stderr)
+
+    # Per-run weather (Garmin returns nulls for her device). Never fatal.
+    try:
+        import weather
+        n = weather.backfill(conn)
+        print(f"  conditions cached for {n} activities")
+    except Exception as e:
+        print(f"  conditions: {e}", file=sys.stderr)
 
     conn.close()
     print(f"Ingest complete: {days} days of daily/sleep, {activities_count} recent activities.")
