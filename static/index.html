@@ -96,6 +96,9 @@
   svg{display:block;max-width:100%;height:auto;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-2)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend .sw{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+  .legend .sw.ln{width:16px;height:0;border-top:2px dashed currentColor;background:none!important;border-radius:0}
+  @media(max-width:599px){.legend{gap:10px 12px;font-size:13px;margin-top:12px}}
   .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
   .legend i.line{height:3px;border-radius:2px;width:16px}
   /* upcoming table */
@@ -123,6 +126,8 @@
     width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:20px 20px calc(24px + env(safe-area-inset-bottom))}
   @media(min-width:600px){.overlay{align-items:center}.sheet{border-radius:20px}}
   .sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--baseline);margin:0 auto 14px}
+  /* touch gestures: drag follows the finger, release springs back or commits */
+  .sheet.snap{transition:transform .22s cubic-bezier(.2,.7,.3,1),opacity .22s ease}
   .sheet h3{margin:0 0 2px;font-size:18px;letter-spacing:-.01em}
   .sheet .meta{color:var(--muted);font-size:13px;margin-bottom:14px}
   .block{margin:14px 0}
@@ -211,16 +216,32 @@ let DATA=null, winState={all:false, weeks:2, offset:0};
 
 // ---------- chart helpers (inline SVG) ----------
 function svgEl(w,h){return el('svg',{viewBox:`0 0 ${w} ${h}`,width:w,height:h,role:'img'});}
+// Charts are authored at 680px wide but CSS scales them down to fit a phone,
+// which shrinks 10px SVG text to ~6px. On mobile we draw larger type in user
+// units so it lands at a readable size after that downscale, and move the wordy
+// band/reference labels out of the plot into an HTML legend underneath.
+const MOBILE=()=>window.matchMedia('(max-width:599px)').matches;
+const FS=()=>MOBILE()?{ax:15,date:15,tag:15,ref:15}:{ax:10,date:10,tag:10,ref:10};
+function chartLegend(items){
+  return el('div',{class:'legend'},items.map(it=>{
+    const c=cssv(it.color);
+    const st=it.shape==='line'?`border-top-color:${c}`
+      :it.shape==='band'?`background:${c};opacity:.45;border-radius:3px`:`background:${c}`;
+    return el('span',{},[el('i',{class:'sw'+(it.shape==='line'?' ln':''),style:st}),it.text]);
+  }));
+}
 
 function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],baseline=null,unit='',
     ptColor=null,tipHtml=null,line=true,refs=[]}){
+  const mob=MOBILE(), fs=FS();
   // Reference-line labels (baseline + refs) live in a right-hand margin, clear of
   // the plotted lines. Size the right pad to the widest such label so nothing overlaps.
+  // On mobile that margin would eat the plot, so labels move to the legend instead.
   const rlabs=[];
   if(baseline!=null) rlabs.push(`baseline ${fmt(baseline)}`);
   refs.forEach(r=>rlabs.push(r.label));
-  const rpad=rlabs.length?Math.max(14,Math.max(...rlabs.map(t=>t.length))*5.4+14):14;
-  const pad={l:38,r:rpad,t:14,b:26}, iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
+  const rpad=(!mob&&rlabs.length)?Math.max(14,Math.max(...rlabs.map(t=>t.length))*5.4+14):14;
+  const pad={l:mob?46:38,r:rpad,t:14,b:mob?34:26}, iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
   const pts=data.filter(d=>d[yKey]!=null);
   const ys=pts.map(d=>d[yKey]); let ymin=Math.min(...ys),ymax=Math.max(...ys);
   bands.forEach(b=>{ymin=Math.min(ymin,b.lo);ymax=Math.max(ymax,b.hi);});
@@ -232,30 +253,32 @@ function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],basel
   // deferred labels, drawn LAST so nothing hides them
   const labels=[];
   // a solid colored tag (white text) used for the in-plot band labels
-  const tag=(x,y,fill,text)=>{const cw=text.length*5.4+10;
+  const tag=(x,y,fill,text)=>{const cw=text.length*(fs.tag*.54)+10;
     const g=el('g',{});
-    g.appendChild(el('rect',{x:x-4,y:y-11,width:cw,height:15,rx:4,fill:cssv(fill),opacity:.92}));
-    g.appendChild(el('text',{x,y,'text-anchor':'start',fill:'#fff','font-size':10,'font-weight':600},text));
+    g.appendChild(el('rect',{x:x-4,y:y-fs.tag-1,width:cw,height:fs.tag+5,rx:4,fill:cssv(fill),opacity:.92}));
+    g.appendChild(el('text',{x,y,'text-anchor':'start',fill:'#fff','font-size':fs.tag,'font-weight':600},text));
     labels.push(g);};
   // a plain label parked in the right margin, aligned to a horizontal line's y
   const marginLabel=(y,fill,text,bold)=>labels.push(
-    el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv(fill),'font-size':10,'font-weight':bold?600:400},text));
+    el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv(fill),'font-size':fs.ref,'font-weight':bold?600:400},text));
   bands.forEach(b=>{const y1=Y(Math.min(b.hi,ymax)),y2=Y(Math.max(b.lo,ymin));
     if(b.hi>ymin&&b.lo<ymax){s.appendChild(el('rect',{x:pad.l,y:y1,width:iw,height:Math.max(0,y2-y1),fill:cssv(b.color),opacity:.14}));
-      if(b.label)tag(pad.l+6,y1+13,b.color,b.label);}});
+      // On mobile the wordy band caption goes to the legend; keep only the range
+      // in-plot so it never covers the dots on a narrow chart.
+      if(b.label)tag(pad.l+6,y1+13,b.color,mob?(b.short||b.label):b.label);}});
   for(let g=0;g<=3;g++){const v=ymin+(ymax-ymin)*g/3,y=Y(v);
     s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
-    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':10},String(Math.round(v))));}
+    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},String(Math.round(v))));}
   if(baseline!=null){const y=Y(baseline);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
-    marginLabel(y,'--muted',`baseline ${fmt(baseline)}`,false);}
+    if(!mob)marginLabel(y,'--muted',`baseline ${fmt(baseline)}`,false);}
   refs.forEach(r=>{const y=Y(r.y);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv(r.color||'--muted'),'stroke-width':1.5,'stroke-dasharray':'2 3'}));
-    marginLabel(y,r.color||'--muted',r.label,true);});
+    if(!mob)marginLabel(y,r.color||'--muted',r.label,true);});
   if(line){const dpath=pts.map((d,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(d[yKey]).toFixed(1)}`).join(' ');
     s.appendChild(el('path',{d:dpath,fill:'none',stroke:cssv(ptColor?'--baseline':color),'stroke-width':ptColor?1.5:2,'stroke-linejoin':'round','stroke-linecap':'round',opacity:ptColor?.7:1}));}
   pts.forEach((d,i)=>{const col=ptColor?ptColor(d):color;
     const c=el('circle',{cx:X(i),cy:Y(d[yKey]),r:ptColor?5:4,fill:ptColor?cssv(col):cssv('--surface'),stroke:cssv(col),'stroke-width':2});
     s.appendChild(c);});
-  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:X(i),y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':10},pts[i].date.slice(5)));});
+  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:X(i),y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
   labels.forEach(l=>s.appendChild(l));  // labels on top
   // big invisible tap targets: full-height column per point, so a tap anywhere near a point selects it
   const spacing=pts.length>1?iw/(pts.length-1):iw;
@@ -386,14 +409,23 @@ function updateTrends(){
       : empty('No sleep data in this range.')));
 
   const runHR=card('Effort per run: easy vs moderate HR',
-    `Each dot is a run, colored by intended effort. Green band is your easy range (~${eb.lo}-${eb.hi} bpm, median ${eb.median}); upper band is tempo.`,
+    MOBILE()
+      ? 'Each dot is a run, colored by intended effort.'
+      : `Each dot is a run, colored by intended effort. Green band is your easy range (~${eb.lo}-${eb.hi} bpm, median ${eb.median}); upper band is tempo.`,
     hasV(runs,'avg_hr')
-      ? el('div',{class:'scroll'},lineChart(runs,{yKey:'avg_hr',unit:' bpm',
-          ptColor:r=>r.intent==='hard'?'--red':'--blue',
-          tipHtml:r=>`<b style="color:${cssv(r.intent==='hard'?'--red':'--blue')}">${fmtDate(r.date)} · ${r.planned_type||'run'}</b>${r.miles} mi · avg ${r.avg_hr} bpm · max ${r.max_hr||'–'} bpm`,
-          bands:[{lo:eb.lo,hi:eb.hi,color:'--green',label:`Easy · talk test (~${eb.lo}-${eb.hi})`},
-                 {lo:166,hi:178,color:'--orange',label:'Moderate · tempo (few words, 165-175)'}],
-          refs:[{y:eb.median,color:'--blue',label:`easy median ${eb.median}`}]}))
+      ? el('div',{},[
+          el('div',{class:'scroll'},lineChart(runs,{yKey:'avg_hr',unit:' bpm',
+            ptColor:r=>r.intent==='hard'?'--red':'--blue',
+            tipHtml:r=>`<b style="color:${cssv(r.intent==='hard'?'--red':'--blue')}">${fmtDate(r.date)} · ${r.planned_type||'run'}</b>${r.miles} mi · avg ${r.avg_hr} bpm · max ${r.max_hr||'–'} bpm`,
+            bands:[{lo:eb.lo,hi:eb.hi,color:'--green',label:`Easy · talk test (~${eb.lo}-${eb.hi})`,short:`${eb.lo}-${eb.hi}`},
+                   {lo:166,hi:178,color:'--orange',label:'Moderate · tempo (few words, 165-175)',short:'165-175'}],
+            refs:[{y:eb.median,color:'--blue',label:`easy median ${eb.median}`}]})),
+          chartLegend([
+            {color:'--blue',text:'easy day'},
+            {color:'--red',text:'hard day (tempo/interval)'},
+            {color:'--green',shape:'band',text:`easy band ${eb.lo}-${eb.hi} bpm`},
+            {color:'--orange',shape:'band',text:'tempo band 165-175'},
+            {color:'--blue',shape:'line',text:`your easy median ${eb.median}`}])])
       : empty('No runs in this range.'));
   if(hasV(runs,'avg_hr'))runHR.appendChild(legend([{color:'--blue',label:'easy · long · strides'},{color:'--red',label:'tempo · interval'}]));
   grid.appendChild(runHR);
@@ -552,8 +584,78 @@ function openDetail(i){
 
   $('#overlay').classList.add('open');
 }
-function closeDetail(){$('#overlay').classList.remove('open');}
+function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.transform='';s.style.opacity='';
+  $('#overlay').classList.remove('open');}
+
+// ---- mobile swipe gestures on the detail sheet ----
+// Left/right pages through the schedule (mirrors the Prev/Next buttons and the
+// desktop arrow keys); a downward drag dismisses. Vertical dragging only takes
+// over when the sheet is already scrolled to the top, so normal content
+// scrolling still works, and the axis is locked on first movement so a scroll
+// never turns into an accidental navigation.
+(function(){
+  const sheet=$('#sheet');
+  const SWIPE_X=55, SWIPE_Y=95, SLOP=12;
+  let sx=0,sy=0,dx=0,dy=0,axis=null,tracking=false,atTop=false;
+
+  const reset=(animate)=>{
+    if(animate){sheet.classList.add('snap');setTimeout(()=>sheet.classList.remove('snap'),240);}
+    sheet.style.transform='';sheet.style.opacity='';
+    axis=null;tracking=false;dx=dy=0;
+  };
+
+  sheet.addEventListener('touchstart',e=>{
+    if(!MOBILE()||e.touches.length!==1){tracking=false;return;}
+    // let horizontally scrollable children (charts) keep their own panning
+    if(e.target.closest&&e.target.closest('.scroll')){tracking=false;return;}
+    const t=e.touches[0];sx=t.clientX;sy=t.clientY;dx=dy=0;axis=null;tracking=true;
+    atTop=sheet.scrollTop<=0;
+    sheet.classList.remove('snap');
+  },{passive:true});
+
+  sheet.addEventListener('touchmove',e=>{
+    if(!tracking||e.touches.length!==1)return;
+    const t=e.touches[0];dx=t.clientX-sx;dy=t.clientY-sy;
+    if(!axis){
+      if(Math.abs(dx)<SLOP&&Math.abs(dy)<SLOP)return;
+      // horizontal only on a clearly sideways move; downward only from the top
+      if(Math.abs(dx)>Math.abs(dy)*1.3)axis='x';
+      else if(dy>0&&atTop)axis='y';
+      else{tracking=false;return;}   // an ordinary vertical scroll: hands off
+    }
+    if(axis==='x'){
+      e.preventDefault();
+      // resist at the ends of the schedule so the limit is felt, not guessed
+      const end=(dx>0&&schedIdx<=0)||(dx<0&&schedIdx>=SCHED.length-1);
+      sheet.style.transform=`translateX(${dx*(end?0.18:0.32)}px)`;
+    }else{
+      e.preventDefault();
+      const d=Math.max(0,dy);
+      sheet.style.transform=`translateY(${d*0.55}px)`;
+      sheet.style.opacity=String(Math.max(0.45,1-d/460));
+    }
+  },{passive:false});
+
+  const finish=()=>{
+    if(!tracking){reset(false);return;}
+    const a=axis,mx=dx,my=dy;
+    if(a==='x'&&Math.abs(mx)>SWIPE_X){
+      const i=schedIdx+(mx<0?1:-1);
+      if(i>=0&&i<SCHED.length){reset(false);openDetail(i);return;}
+    }else if(a==='y'&&my>SWIPE_Y){
+      sheet.classList.add('snap');
+      sheet.style.transform='translateY(110%)';sheet.style.opacity='0';
+      setTimeout(()=>{closeDetail();reset(false);},200);
+      tracking=false;return;
+    }
+    reset(true);
+  };
+  sheet.addEventListener('touchend',finish,{passive:true});
+  sheet.addEventListener('touchcancel',()=>reset(true),{passive:true});
+})();
 $('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeDetail();});
+// charts are sized/labelled differently per breakpoint, so redraw on rotate/resize
+window.matchMedia('(max-width:599px)').addEventListener('change',()=>{if(DATA)updateTrends();});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closeDetail();return;}
   if(!$('#overlay').classList.contains('open'))return;
