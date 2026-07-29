@@ -96,7 +96,8 @@
   svg{display:block;max-width:100%;height:auto;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-2)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
-  @media(max-width:599px){.legend{gap:10px 12px;font-size:13px;margin-top:12px}}
+  @media(max-width:599px){.legend{flex-direction:column;flex-wrap:nowrap;align-items:flex-start;
+    gap:8px;font-size:13px;margin-top:12px}}
   .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
   .legend i.line{height:3px;border-radius:2px;width:16px}
   /* upcoming table */
@@ -121,11 +122,19 @@
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:50}
   .overlay.open{display:flex}
   .sheet{background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.5);
-    width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:20px 20px calc(24px + env(safe-area-inset-bottom))}
+    width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:20px 20px calc(24px + env(safe-area-inset-bottom));
+    /* pan-y: the browser may scroll this vertically but must never claim a
+       sideways drag, otherwise it starts scrolling before our swipe threshold
+       is reached and preventDefault() no longer has any effect. contain stops
+       an over-scroll at the top from chaining out to the page behind. */
+    touch-action:pan-y;overscroll-behavior:contain}
   @media(min-width:600px){.overlay{align-items:center}.sheet{border-radius:20px}}
   .sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--baseline);margin:0 auto 14px}
   /* touch gestures: drag follows the finger, release springs back or commits */
   .sheet.snap{transition:transform .22s cubic-bezier(.2,.7,.3,1),opacity .22s ease}
+  /* while the sheet is open the page behind is pinned, so a dismiss drag can
+     never double as a background scroll */
+  body.locked{position:fixed;left:0;right:0;width:100%;overflow:hidden}
   .sheet h3{margin:0 0 2px;font-size:18px;letter-spacing:-.01em}
   .sheet .meta{color:var(--muted);font-size:13px;margin-bottom:14px}
   .block{margin:14px 0}
@@ -268,7 +277,12 @@ function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],basel
   pts.forEach((d,i)=>{const col=ptColor?ptColor(d):color;
     const c=el('circle',{cx:X(i),cy:Y(d[yKey]),r:ptColor?5:4,fill:ptColor?cssv(col):cssv('--surface'),stroke:cssv(col),'stroke-width':2});
     s.appendChild(c);});
-  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:X(i),y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
+  // Anchor the end labels inward: centred text at the plot edge overflows the
+  // padding and gets clipped by the viewBox (the newest date lost its tail).
+  [...new Set([0,Math.floor(pts.length/2),pts.length-1])].forEach(i=>{if(pts[i])
+    s.appendChild(el('text',{x:X(i),y:h-8,
+      'text-anchor':i===0?'start':i===pts.length-1?'end':'middle',
+      fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
   labels.forEach(l=>s.appendChild(l));  // labels on top
   // big invisible tap targets: full-height column per point, so a tap anywhere near a point selects it
   const spacing=pts.length>1?iw/(pts.length-1):iw;
@@ -317,7 +331,10 @@ function barChart(data,{yKey,w=680,h=200,color='--blue',target=null,unit='',tipH
     s.appendChild(r);});
   if(target!=null){const y=Y(target);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
     if(!mob)s.appendChild(el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv('--muted'),'font-size':fs.ref},tlab));}
-  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:pad.l+bw*i+bw/2,y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
+  [...new Set([0,Math.floor(pts.length/2),pts.length-1])].forEach(i=>{if(pts[i])
+    s.appendChild(el('text',{x:Math.min(Math.max(pad.l+bw*i+bw/2,pad.l),pad.l+iw),y:h-8,
+      'text-anchor':i===0?'start':i===pts.length-1?'end':'middle',
+      fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
   // full-height tap targets per bar
   pts.forEach((d,i)=>{const hit=el('rect',{x:pad.l+bw*i,y:pad.t,width:bw,height:ih,fill:'transparent','pointer-events':'all'});
     bindTip(hit, tipHtml?tipHtml(d):`<b>${fmtDate(d.date)}</b>${d[yKey]}${unit}`);s.appendChild(hit);});
@@ -586,10 +603,19 @@ function openDetail(i){
   if(w.description) sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Workout & notes'}),
     el('div',{class:'txt',text:w.description})]));
 
-  $('#overlay').classList.add('open');
+  if(!$('#overlay').classList.contains('open')){lockScroll();$('#overlay').classList.add('open');}
 }
+// Pin the page behind the sheet. position:fixed is used rather than
+// overflow:hidden because iOS ignores the latter on body; the scroll offset is
+// stashed and restored so closing lands you back where you were.
+let _lockY=0;
+function lockScroll(){_lockY=window.scrollY||0;
+  document.body.style.top=`-${_lockY}px`;document.body.classList.add('locked');}
+function unlockScroll(){if(!document.body.classList.contains('locked'))return;
+  document.body.classList.remove('locked');document.body.style.top='';
+  window.scrollTo(0,_lockY);}
 function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.transform='';s.style.opacity='';
-  $('#overlay').classList.remove('open');}
+  $('#overlay').classList.remove('open');unlockScroll();}
 
 // ---- mobile swipe gestures on the detail sheet ----
 // Left/right pages through the schedule (mirrors the Prev/Next buttons and the
@@ -599,7 +625,7 @@ function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.tr
 // never turns into an accidental navigation.
 (function(){
   const sheet=$('#sheet');
-  const SWIPE_X=55, SWIPE_Y=95, SLOP=12;
+  const SWIPE_X=50, SWIPE_Y=90, SLOP=8;
   let sx=0,sy=0,dx=0,dy=0,axis=null,tracking=false,atTop=false;
 
   const reset=(animate)=>{
@@ -621,9 +647,11 @@ function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.tr
     if(!tracking||e.touches.length!==1)return;
     const t=e.touches[0];dx=t.clientX-sx;dy=t.clientY-sy;
     if(!axis){
-      if(Math.abs(dx)<SLOP&&Math.abs(dy)<SLOP)return;
-      // horizontal only on a clearly sideways move; downward only from the top
-      if(Math.abs(dx)>Math.abs(dy)*1.3)axis='x';
+      const adx=Math.abs(dx),ady=Math.abs(dy);
+      if(adx<SLOP&&ady<SLOP)return;
+      // touch-action:pan-y guarantees a sideways drag is ours, so a simple
+      // dominant-axis test is enough; downward drags only from the top
+      if(adx>ady)axis='x';
       else if(dy>0&&atTop)axis='y';
       else{tracking=false;return;}   // an ordinary vertical scroll: hands off
     }
@@ -640,8 +668,12 @@ function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.tr
     }
   },{passive:false});
 
-  const finish=()=>{
+  const finish=e=>{
     if(!tracking){reset(false);return;}
+    // take the delta from the released touch: the last touchmove can be
+    // coalesced away, leaving a stale dx that under-reports the swipe
+    const t=e&&e.changedTouches&&e.changedTouches[0];
+    if(t){dx=t.clientX-sx;dy=t.clientY-sy;}
     const a=axis,mx=dx,my=dy;
     if(a==='x'&&Math.abs(mx)>SWIPE_X){
       const i=schedIdx+(mx<0?1:-1);
@@ -656,6 +688,8 @@ function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.tr
   };
   sheet.addEventListener('touchend',finish,{passive:true});
   sheet.addEventListener('touchcancel',()=>reset(true),{passive:true});
+  // the dimmed backdrop itself never scrolls anything
+  $('#overlay').addEventListener('touchmove',e=>{if(e.target.id==='overlay')e.preventDefault();},{passive:false});
 })();
 $('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeDetail();});
 // charts are sized/labelled differently per breakpoint, so redraw on rotate/resize
