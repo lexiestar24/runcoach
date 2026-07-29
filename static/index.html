@@ -96,8 +96,6 @@
   svg{display:block;max-width:100%;height:auto;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-2)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
-  .legend .sw{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
-  .legend .sw.ln{width:16px;height:0;border-top:2px dashed currentColor;background:none!important;border-radius:0}
   @media(max-width:599px){.legend{gap:10px 12px;font-size:13px;margin-top:12px}}
   .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
   .legend i.line{height:3px;border-radius:2px;width:16px}
@@ -222,14 +220,6 @@ function svgEl(w,h){return el('svg',{viewBox:`0 0 ${w} ${h}`,width:w,height:h,ro
 // band/reference labels out of the plot into an HTML legend underneath.
 const MOBILE=()=>window.matchMedia('(max-width:599px)').matches;
 const FS=()=>MOBILE()?{ax:15,date:15,tag:15,ref:15}:{ax:10,date:10,tag:10,ref:10};
-function chartLegend(items){
-  return el('div',{class:'legend'},items.map(it=>{
-    const c=cssv(it.color);
-    const st=it.shape==='line'?`border-top-color:${c}`
-      :it.shape==='band'?`background:${c};opacity:.45;border-radius:3px`:`background:${c}`;
-    return el('span',{},[el('i',{class:'sw'+(it.shape==='line'?' ln':''),style:st}),it.text]);
-  }));
-}
 
 function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],baseline=null,unit='',
     ptColor=null,tipHtml=null,line=true,refs=[]}){
@@ -290,41 +280,44 @@ function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],basel
 }
 
 function groupedBars(data,{w=680,h=240}){
-  const pad={l:34,r:10,t:14,b:34}, iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
+  const mob=MOBILE(), fs=FS();
+  const pad={l:mob?42:34,r:10,t:14,b:mob?40:34}, iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
   const ymax=Math.max(10,...data.map(d=>Math.max(d.planned,d.actual)))*1.1;
   const Y=v=>pad.t+ih-ih*v/ymax;
   const bw=iw/data.length, inner=bw*0.7, each=inner/2;
   const s=svgEl(w,h);
   for(let g=0;g<=4;g++){const v=ymax*g/4,y=Y(v);
     s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
-    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':10},String(Math.round(v))));}
+    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},String(Math.round(v))));}
   data.forEach((d,i)=>{const x0=pad.l+bw*i+(bw-inner)/2;
     const mk=(val,off,color,cls)=>{const y=Y(val),bh=pad.t+ih-y;
       const r=el('rect',{x:x0+off,y,width:each-2,height:Math.max(0,bh),rx:3,fill:cssv(color)});
       bindTip(r,`<b>Week ${d.week}</b>Planned: ${d.planned} mi<br>Actual: ${d.actual} mi`);s.appendChild(r);};
     mk(d.planned,0,'--baseline','planned'); mk(d.actual,each,'--blue','actual');
-    if(i%2===0||data.length<=12)s.appendChild(el('text',{x:x0+inner/2,y:h-16,'text-anchor':'middle',fill:cssv('--muted'),'font-size':9},d.week));
+    if(i%2===0||data.length<=12)s.appendChild(el('text',{x:x0+inner/2,y:h-16,'text-anchor':'middle',fill:cssv('--muted'),'font-size':mob?13:9},d.week));
   });
-  s.appendChild(el('text',{x:pad.l+iw/2,y:h-3,'text-anchor':'middle',fill:cssv('--muted'),'font-size':10},'training week'));
+  s.appendChild(el('text',{x:pad.l+iw/2,y:h-3,'text-anchor':'middle',fill:cssv('--muted'),'font-size':fs.date},'training week'));
   return s;
 }
 
 function barChart(data,{yKey,w=680,h=200,color='--blue',target=null,unit='',tipHtml=null}){
+  const mob=MOBILE(), fs=FS();
   const tlab=target!=null?`target ${target}${unit}`:null;
-  const pad={l:34,r:tlab?tlab.length*5.4+14:10,t:14,b:26}, iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
+  const pad={l:mob?42:34,r:(tlab&&!mob)?tlab.length*5.4+14:10,t:14,b:mob?32:26},
+    iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
   const pts=data.filter(d=>d[yKey]!=null);
   const ymax=Math.max(1,...pts.map(d=>d[yKey]))*1.15;
   const Y=v=>pad.t+ih-ih*v/ymax, bw=iw/pts.length;
   const s=svgEl(w,h);
   for(let g=0;g<=3;g++){const v=ymax*g/3,y=Y(v);
     s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
-    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':10},v.toFixed(0)));}
+    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},v.toFixed(0)));}
   pts.forEach((d,i)=>{const y=Y(d[yKey]),x=pad.l+bw*i+bw*0.15;
     const r=el('rect',{x,y,width:bw*0.7,height:Math.max(0,pad.t+ih-y),rx:3,fill:cssv(color)});
     s.appendChild(r);});
   if(target!=null){const y=Y(target);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
-    s.appendChild(el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv('--muted'),'font-size':10},tlab));}
-  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:pad.l+bw*i+bw/2,y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':10},pts[i].date.slice(5)));});
+    if(!mob)s.appendChild(el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv('--muted'),'font-size':fs.ref},tlab));}
+  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(pts[i])s.appendChild(el('text',{x:pad.l+bw*i+bw/2,y:h-8,'text-anchor':'middle',fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
   // full-height tap targets per bar
   pts.forEach((d,i)=>{const hit=el('rect',{x:pad.l+bw*i,y:pad.t,width:bw,height:ih,fill:'transparent','pointer-events':'all'});
     bindTip(hit, tipHtml?tipHtml(d):`<b>${fmtDate(d.date)}</b>${d[yKey]}${unit}`);s.appendChild(hit);});
@@ -351,8 +344,15 @@ function card(title,sub,node){
     node
   ].filter(Boolean));
 }
-function legend(items){return el('div',{class:'legend'},items.map(it=>
-  el('span',{},[el('i',{class:it.line?'line':'',style:`background:${cssv(it.color)}`}),it.label])));}
+// Legend swatches: solid square (series), thin bar (line), dashed bar (reference
+// line), translucent block (HR band). Bands and reference lines are labelled here
+// because on mobile their in-plot captions are dropped to keep the plot readable.
+function legend(items){return el('div',{class:'legend'},items.map(it=>{
+  const c=cssv(it.color);
+  const cls=(it.line||it.dash)?'line':'';
+  const st=it.dash?`background:none;height:0;border-top:2px dashed ${c}`
+    :it.band?`background:${c};opacity:.5`:`background:${c}`;
+  return el('span',{},[el('i',{class:cls,style:st}),it.label]);}));}
 
 // ---------- trends time-window ----------
 function dayShift(iso,n){const d=new Date(iso+'T00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
@@ -398,8 +398,12 @@ function updateTrends(){
 
   grid.appendChild(card('Resting heart rate','Lower & stable = recovered. Dashed line is your baseline.',
     hasV(rec,'resting_hr')
-      ? el('div',{class:'scroll'},lineChart(rec,{yKey:'resting_hr',color:'#ae5225',baseline:M_baseline(DATA),unit:' bpm',
-          tipHtml:d=>`<b>${fmtDate(d.date)} · resting HR</b>${d.resting_hr} bpm${d.sleep_score?` · sleep ${d.sleep_score}`:''}`}))
+      ? el('div',{},[
+          el('div',{class:'scroll'},lineChart(rec,{yKey:'resting_hr',color:'#ae5225',baseline:M_baseline(DATA),unit:' bpm',
+            tipHtml:d=>`<b>${fmtDate(d.date)} · resting HR</b>${d.resting_hr} bpm${d.sleep_score?` · sleep ${d.sleep_score}`:''}`})),
+          // the in-plot baseline caption is dropped on mobile, so keep its value here
+          legend([{color:'#ae5225',label:'resting HR'},
+            {color:'--baseline',dash:true,label:`your baseline ${M_baseline(DATA)} bpm`}])])
       : empty('No resting-HR data in this range.')));
 
   grid.appendChild(card('Sleep duration','Nightly hours. Dashed line = 7.5h feel-good target.',
@@ -420,12 +424,12 @@ function updateTrends(){
             bands:[{lo:eb.lo,hi:eb.hi,color:'--green',label:`Easy · talk test (~${eb.lo}-${eb.hi})`,short:`${eb.lo}-${eb.hi}`},
                    {lo:166,hi:178,color:'--orange',label:'Moderate · tempo (few words, 165-175)',short:'165-175'}],
             refs:[{y:eb.median,color:'--blue',label:`easy median ${eb.median}`}]})),
-          chartLegend([
-            {color:'--blue',text:'easy day'},
-            {color:'--red',text:'hard day (tempo/interval)'},
-            {color:'--green',shape:'band',text:`easy band ${eb.lo}-${eb.hi} bpm`},
-            {color:'--orange',shape:'band',text:'tempo band 165-175'},
-            {color:'--blue',shape:'line',text:`your easy median ${eb.median}`}])])
+          legend([
+            {color:'--blue',label:'easy day'},
+            {color:'--red',label:'hard day (tempo/interval)'},
+            {color:'--green',band:true,label:`easy band ${eb.lo}-${eb.hi} bpm`},
+            {color:'--orange',band:true,label:'tempo band 165-175'},
+            {color:'--blue',dash:true,label:`your easy median ${eb.median}`}])])
       : empty('No runs in this range.'));
   if(hasV(runs,'avg_hr'))runHR.appendChild(legend([{color:'--blue',label:'easy · long · strides'},{color:'--red',label:'tempo · interval'}]));
   grid.appendChild(runHR);
