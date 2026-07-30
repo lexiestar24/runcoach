@@ -637,8 +637,19 @@ def series(conn, days=45):
             if wmon <= d <= wmon + dt.timedelta(days=6):
                 info["actual"] += (r["distance_m"] or 0) / MILE_M
                 break
-    weekly = [{"week": v["week"], "planned": round(v["planned"], 1), "actual": round(v["actual"], 1)}
-              for v in sorted(weeks.values(), key=lambda x: x["week"])]
+    # carry each week's Mon-Sun span so the dashboard can filter this chart to the
+    # same time window as the others
+    weekly = []
+    for v in sorted(weeks.values(), key=lambda x: x["week"]):
+        ws = dt.date.fromisoformat(v["start"])
+        wmon = ws - dt.timedelta(days=ws.weekday())
+        weekly.append({
+            "week": v["week"],
+            "planned": round(v["planned"], 1),
+            "actual": round(v["actual"], 1),
+            "start": wmon.isoformat(),
+            "end": (wmon + dt.timedelta(days=6)).isoformat(),
+        })
 
     # Easy-HR band derived from YOUR actual easy runs (median +/- 5), so it tracks
     # reality (heat now, cooler later) instead of the plan's theoretical <150.
