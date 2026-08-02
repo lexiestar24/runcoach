@@ -172,6 +172,35 @@
   .pill.upcoming{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--blue)}
   .pill.missed{background:color-mix(in srgb,var(--baseline) 30%,transparent);color:var(--text-2)}
   .pill.moved{background:color-mix(in srgb,var(--yellow) 18%,transparent);color:var(--yellow)}
+  /* reschedule control + dialog */
+  .movebtn{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:8px;
+    background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);box-shadow:none}
+  .movebtn:hover{background:#ae5225;color:#fff;border-color:transparent}
+  .rsoverlay{z-index:70}
+  .rssheet{touch-action:auto;max-width:460px}
+  .rssheet h3{margin:0 0 4px;font-size:18px}
+  .rs-meta{color:var(--text-2);font-size:14px;margin-bottom:2px}
+  .rs-cur{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .rs-cur b{color:var(--yellow);font-weight:600}
+  .rs-lab{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+    font-weight:600;margin:0 0 8px}
+  .rs-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:8px;margin-bottom:18px}
+  .rs-chip{padding:9px 6px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);
+    font-size:12.5px;line-height:1.3;text-align:center;box-shadow:none;color:var(--text-2)}
+  .rs-chip b{display:block;font-size:14px;color:var(--text);font-weight:650}
+  .rs-chip.on{background:#004f46;border-color:transparent;color:#f0e7d8}
+  .rs-chip.on b{color:#fff}
+  .rs-chip.busy{opacity:.55}
+  input[type=date]{width:100%;font:inherit;font-size:16px;color:var(--text);background:var(--surface-2);
+    border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:16px}
+  input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.8);cursor:pointer}
+  .rs-warn{font-size:13px;line-height:1.45;border-radius:10px;padding:10px 12px;margin-bottom:16px;
+    background:color-mix(in srgb,var(--warning) 13%,transparent);color:var(--warning)}
+  .rs-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .rs-actions .grow{flex:1;min-width:0}
+  .rs-save{background:#ae5225;color:#fff;border-color:transparent;font-weight:650}
+  .rs-save[disabled]{opacity:.4;pointer-events:none}
+  .rs-reset{background:none;border-color:var(--border);color:var(--text-2);font-size:13px}
   .wt{font-size:11px;padding:1px 7px;border-radius:5px;color:#fff;font-weight:600}
   .loading{color:var(--muted);text-align:center;padding:60px 0}
   .err{color:var(--critical);text-align:center;padding:40px 0;font-size:14px}
@@ -190,6 +219,7 @@
   <div id="app"><div class="loading">Loading your data…</div></div>
 </div>
 <div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+<div class="overlay rsoverlay" id="rsoverlay"><div class="sheet rssheet" id="rssheet"></div></div>
 <div class="tip" id="tip"></div>
 
 <script>
@@ -554,6 +584,8 @@ function render(d){
         // a run you deliberately moved reads as "moved", never as a lapse
         el('span',{class:`pill ${w.rescheduled&&w.status==='upcoming'?'moved':w.status}`,
           text:w.rescheduled&&w.status==='upcoming'?'moved':w.status}),
+        // only runs still ahead of you can be moved; a logged run has happened
+        w.status!=='done'?mkMoveBtn(i):null,
         el('span',{class:'chev',text:'›'})]),
       el('div',{class:'sr-bot'},[
         stat('plan',w.planned_miles?`${w.planned_miles} mi`:'rest'),
@@ -568,6 +600,113 @@ function render(d){
     el('div',{class:'card schedcard'},list)]));
 }
 function M_baseline(d){return d.readiness.baseline_rhr;}
+
+// A move button that never triggers the row's own open-detail click.
+function mkMoveBtn(i,label){
+  const b=el('button',{class:'movebtn',text:label||'⇄ Move'});
+  b.addEventListener('click',e=>{e.stopPropagation();openReschedule(i);});
+  return b;
+}
+
+// ---------- reschedule dialog ----------
+// The date a workout is actually due: its reschedule target when it has one.
+const effDate=w=>w.moved_to||w.date;
+const todayISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);};
+const wdayLong=iso=>{try{return new Date(iso+'T00:00').toLocaleDateString('en-US',{weekday:'short'});}catch(e){return '';}};
+
+function openReschedule(i){
+  const w=SCHED[i]; if(!w)return;
+  let target=effDate(w);
+  const sheet=$('#rssheet'); sheet.innerHTML='';
+  const x=el('button',{class:'closex',html:'&times;'});
+  x.addEventListener('click',closeReschedule); sheet.appendChild(x);
+  sheet.appendChild(el('div',{class:'grab'}));
+  sheet.appendChild(el('h3',{text:'Reschedule'}));
+  sheet.appendChild(el('div',{class:'rs-meta',text:w.summary||`${w.type} run`}));
+  sheet.appendChild(el('div',{class:'rs-cur',html:
+    `Planned for ${wdayLong(w.date)} ${fmtDate(w.date)}`+
+    (w.moved_to?` · already moved to <b>${wdayLong(w.moved_to)} ${fmtDate(w.moved_to)}</b>`:'')}));
+
+  // Quick pick: the next 7 days from today, which on a phone beats opening the
+  // calendar for what is nearly always a move of a day or two.
+  sheet.appendChild(el('div',{class:'rs-lab',text:'Quick pick'}));
+  const chips=el('div',{class:'rs-chips'});
+  const base=todayISO();
+  for(let k=0;k<7;k++){
+    const iso=dayShift(base,k);
+    const taken=SCHED.some(o=>o!==w&&effDate(o)===iso);
+    const c=el('button',{class:'rs-chip'+(iso===target?' on':'')+(taken?' busy':''),
+      title:taken?'Another workout is already on this day':''},
+      [el('b',{text:k===0?'Today':wdayLong(iso)}),fmtDate(iso)]);
+    c.addEventListener('click',()=>{target=iso;sync();});
+    c.dataset.iso=iso; chips.appendChild(c);
+  }
+  sheet.appendChild(chips);
+
+  sheet.appendChild(el('div',{class:'rs-lab',text:'Or pick any date'}));
+  const input=el('input',{type:'date',value:target});
+  input.addEventListener('change',()=>{if(input.value){target=input.value;sync();}});
+  sheet.appendChild(input);
+
+  const warn=el('div',{class:'rs-warn',style:'display:none'});
+  sheet.appendChild(warn);
+
+  const save=el('button',{class:'rs-save grow',text:'Save'});
+  const cancel=el('button',{text:'Cancel'});
+  cancel.addEventListener('click',closeReschedule);
+  const acts=[cancel];
+  if(w.moved_to){
+    const reset=el('button',{class:'rs-reset',text:`Reset to ${fmtDate(w.date)}`});
+    reset.addEventListener('click',()=>commit(w,null,reset));
+    acts.push(reset);
+  }
+  acts.push(save);
+  save.addEventListener('click',()=>commit(w,target,save));
+  sheet.appendChild(el('div',{class:'rs-actions'},acts));
+
+  // Keep chips, input, warning and the Save button agreeing with the current target.
+  function sync(){
+    [...chips.children].forEach(c=>c.classList.toggle('on',c.dataset.iso===target));
+    if(input.value!==target)input.value=target;
+    const clash=SCHED.find(o=>o!==w&&effDate(o)===target);
+    const msgs=[];
+    if(clash)msgs.push(`${wdayLong(target)} ${fmtDate(target)} already has a workout: ${clash.type}${clash.planned_miles?` (${clash.planned_miles} mi)`:''}. Two workouts on one day both match the same run, so only one will register.`);
+    if(target<todayISO())msgs.push(`That date is in the past. If you already ran it, it will match the run logged that day.`);
+    warn.style.display=msgs.length?'block':'none';
+    warn.innerHTML=msgs.join('<br><br>');
+    save.disabled=(target===effDate(w));
+    save.textContent=target===w.date&&w.moved_to?'Move back':'Save';
+  }
+  sync();
+  if(!$('#rsoverlay').classList.contains('open')){
+    if(!$('#overlay').classList.contains('open'))lockScroll();
+    $('#rsoverlay').classList.add('open');
+  }
+}
+
+function closeReschedule(){
+  $('#rsoverlay').classList.remove('open');
+  if(!$('#overlay').classList.contains('open'))unlockScroll();
+}
+
+// Write the change, then re-render from the server so status, adjustments and
+// the evaluation all reflect it. null newDate clears the reschedule.
+async function commit(w,newDate,btn){
+  const label=btn.textContent; btn.textContent='Saving…'; btn.disabled=true;
+  try{
+    const r=newDate
+      ? await fetch('/api/reschedule',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({orig_date:w.date,new_date:newDate,note:'moved from the dashboard'})})
+      : await fetch(`/api/reschedule/${w.date}`,{method:'DELETE'});
+    if(!r.ok)throw new Error(r.status);
+    closeReschedule(); closeDetail();
+    await load(true);
+  }catch(e){
+    btn.textContent=label; btn.disabled=false;
+    const warn=$('#rssheet .rs-warn');
+    if(warn){warn.style.display='block';warn.textContent=`Couldn't save (${e.message}). The server may be down.`;}
+  }
+}
 
 // ---------- workout detail modal ----------
 function warmup(type){
@@ -594,6 +733,8 @@ function openDetail(i){
     mkNav('‹ Prev',-1,schedIdx<=0),
     el('span',{class:'navpos',text:`${schedIdx+1} / ${SCHED.length}`}),
     mkNav('Next ›',1,schedIdx>=SCHED.length-1)]));
+  if(w.status!=='done')sheet.appendChild(
+    el('div',{style:'margin:0 0 14px'},mkMoveBtn(schedIdx,'⇄ Reschedule this run')));
   const mi=w.planned_miles?`${w.planned_miles} mi · `:'';
   sheet.appendChild(el('h3',{text:w.summary||`${w.type} run`}));
   sheet.appendChild(el('div',{class:'meta',text:`Week ${w.week} · ${w.date} (${w.weekday}) · ${mi}${w.type}${w.moved_to?` · moved to ${w.moved_to}`:''}`}));
@@ -729,8 +870,13 @@ function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.tr
 $('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeDetail();});
 // charts are sized/labelled differently per breakpoint, so redraw on rotate/resize
 window.matchMedia('(max-width:599px)').addEventListener('change',()=>{if(DATA)updateTrends();});
+$('#rsoverlay').addEventListener('click',e=>{if(e.target.id==='rsoverlay')closeReschedule();});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeDetail();return;}
+  // the reschedule dialog sits above the detail sheet, so it closes first
+  if(e.key==='Escape'){
+    if($('#rsoverlay').classList.contains('open'))closeReschedule();else closeDetail();
+    return;}
+  if($('#rsoverlay').classList.contains('open'))return;   // don't page behind the dialog
   if(!$('#overlay').classList.contains('open'))return;
   if(e.key==='ArrowLeft'&&schedIdx>0)openDetail(schedIdx-1);
   if(e.key==='ArrowRight'&&schedIdx<SCHED.length-1)openDetail(schedIdx+1);
@@ -738,10 +884,12 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('pointerdown',()=>{$('#tip').style.display='none';});
 
 // ---------- boot ----------
-async function load(){
+async function load(keepScroll){
+  const y=keepScroll?(window.scrollY||0):0;
   try{
     const r=await fetch('/api/dashboard'); if(!r.ok)throw new Error(r.status);
     render(await r.json());
+    if(keepScroll)window.scrollTo(0,y);   // a reschedule shouldn't fling you to the top
   }catch(e){ $('#app').innerHTML=`<div class="err">Couldn't load data (${e.message}).<br>Is the server running & Garmin synced?</div>`; }
 }
 $('#refresh').addEventListener('click',async()=>{
