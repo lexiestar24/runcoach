@@ -355,6 +355,14 @@ def evaluate(w, conn=None, ctx=None):
     heat_off = cond.get("hr_heat_offset") or 0.0
     ei, adj_hr = _efficiency(a, heat_off)
 
+    # --- 0. rescheduled: credit the move, don't treat the shifted day as a slip ---
+    if w.get("rescheduled") and w.get("moved_to"):
+        orig = dt.date.fromisoformat(w["date"])
+        new = dt.date.fromisoformat(w["moved_to"])
+        points.append(
+            f"Rescheduled from {orig.strftime('%a %m-%d')} to {new.strftime('%a %m-%d')} "
+            f"and you got it done. Moving a run to protect it counts as consistency, not a missed session.")
+
     # --- 1. distance vs plan ---
     if planned and dist is not None:
         diff = dist - planned
@@ -571,14 +579,31 @@ def adjustments(conn):
             out.append({"severity": "med", "date": w["date"],
                 "text": f"Conflict on {w['date']} ({blocked[w['date']]}) clashes with a {w['type']} run ({w['planned_miles']} mi).{move}"})
 
-    # 3) Missed hard workouts recently
+    # 3) Rescheduled workouts still ahead of you: acknowledge the move so a run you
+    #    deliberately shifted never reads as a lapse.
+    def _due(w):
+        return w.get("moved_to") or w["date"]
+
+    moved_ahead = [w for w in plan if w.get("rescheduled") and w["status"] == "upcoming"
+                   and _due(w) <= (today + dt.timedelta(days=2)).isoformat()]
+    if moved_ahead:
+        w = moved_ahead[0]
+        due = dt.date.fromisoformat(_due(w))
+        when = "today" if due == today else "tomorrow" if due == today + dt.timedelta(days=1) \
+            else f"on {due.strftime('%a %m-%d')}"
+        out.append({"severity": "low", "date": _due(w),
+            "text": f"Your {w['type']} ({w['planned_miles']} mi) moved from {dt.date.fromisoformat(w['date']).strftime('%a %m-%d')} to {due.strftime('%a %m-%d')} and is on for {when}. Nothing missed, just shifted. Run it as written."})
+
+    # 4) Missed hard workouts recently. A rescheduled run is judged from the day it
+    #    was moved to, so it only counts as missed once THAT day has passed.
     recent_missed = [w for w in plan if w["status"] == "missed"
                      and w["type"] in HARD_TYPES
-                     and w["date"] >= (today - dt.timedelta(days=4)).isoformat()]
+                     and _due(w) >= (today - dt.timedelta(days=4)).isoformat()]
     if recent_missed:
         w = recent_missed[-1]
-        out.append({"severity": "low", "date": w["date"],
-            "text": f"Missed the {w['date']} {w['type']} ({w['planned_miles']} mi). Don't cram it back in. Just resume the schedule; one missed session won't hurt the Nov 7 goal."})
+        moved = f" (already moved from {w['date']})" if w.get("rescheduled") else ""
+        out.append({"severity": "low", "date": _due(w),
+            "text": f"Missed the {_due(w)} {w['type']} ({w['planned_miles']} mi){moved}. Don't cram it back in. Just resume the schedule; one missed session won't hurt the Nov 7 goal."})
 
     if not out:
         out.append({"severity": "low", "date": None,

@@ -171,6 +171,7 @@
   .pill.done{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--success-ink)}
   .pill.upcoming{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--blue)}
   .pill.missed{background:color-mix(in srgb,var(--baseline) 30%,transparent);color:var(--text-2)}
+  .pill.moved{background:color-mix(in srgb,var(--yellow) 18%,transparent);color:var(--yellow)}
   .wt{font-size:11px;padding:1px 7px;border-radius:5px;color:#fff;font-weight:600}
   .loading{color:var(--muted);text-align:center;padding:60px 0}
   .err{color:var(--critical);text-align:center;padding:40px 0;font-size:14px}
@@ -550,7 +551,9 @@ function render(d){
         w.moved_to?el('span',{class:'moved',text:`→ ${fmtDate(w.moved_to)}`}):null,
         el('span',{class:'wt',style:`background:${cssv(c)};color:${c==='--red'?'#fff':'#2a1c0e'}`,text:w.type}),
         el('span',{class:'sr-gap'}),
-        el('span',{class:`pill ${w.status}`,text:w.status}),
+        // a run you deliberately moved reads as "moved", never as a lapse
+        el('span',{class:`pill ${w.rescheduled&&w.status==='upcoming'?'moved':w.status}`,
+          text:w.rescheduled&&w.status==='upcoming'?'moved':w.status}),
         el('span',{class:'chev',text:'›'})]),
       el('div',{class:'sr-bot'},[
         stat('plan',w.planned_miles?`${w.planned_miles} mi`:'rest'),

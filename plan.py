@@ -138,6 +138,7 @@ def plan_with_actuals(conn):
         item = dict(w)
         if match_date != w["date"]:
             item["moved_to"] = match_date
+            item["rescheduled"] = True
         if actual:
             keys = actual.keys()
             item["actual"] = {
@@ -159,7 +160,12 @@ def plan_with_actuals(conn):
             }
             item["status"] = "done"
         else:
-            item["status"] = "upcoming" if w["date"] >= dt.date.today().isoformat() else "missed"
+            # Status is judged against the date the workout is actually due, which
+            # is the rescheduled date when there is one. Comparing against the
+            # original date marked a run "missed" the moment its planned day
+            # passed, even though it had been deliberately moved to a later day
+            # that has not arrived yet.
+            item["status"] = "upcoming" if match_date >= dt.date.today().isoformat() else "missed"
         out.append(item)
     return out
 
