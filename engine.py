@@ -35,6 +35,130 @@ def _median(vals):
     return statistics.median(vals) if vals else None
 
 
+# ---------- within-day signals ----------
+# Readiness used to be a morning verdict: overnight Body Battery peak and the
+# whole day's average stress. But a 91 at 7am is not a 91 at 5:30pm: Body Battery
+# here typically falls from ~80 at wake to the low 20s by the time of an evening run.
+# These helpers read the 3-minute Body Battery / stress curve so the score can be
+# asked for a specific moment: right now, or the hour she is actually going to run.
+BASELINE_DAYS = 30          # history behind the hour-of-day profile
+_PROFILE_CACHE = {}         # {asof: (built_at, profile)} -- a 30-day baseline is
+_PROFILE_TTL = 600          # slow-moving, so a 10 min cache costs nothing
+
+
+def _now_minute():
+    n = dt.datetime.now()
+    return n.hour * 60 + n.minute
+
+
+def _hhmm(minute):
+    h, m = divmod(int(minute), 60)
+    ap = "am" if h < 12 else "pm"
+    h12 = h % 12 or 12
+    return f"{h12}:{m:02d}{ap}"
+
+
+def _to_minute(at):
+    """Accept 'HH:MM', 'YYYY-MM-DD HH:MM:SS', a datetime, or minutes-past-midnight."""
+    if at is None or isinstance(at, (int, float)):
+        return int(at) if at is not None else None
+    if isinstance(at, dt.datetime):
+        return at.hour * 60 + at.minute
+    s = str(at)
+    if " " in s:
+        s = s.split(" ", 1)[1]
+    try:
+        h, m = s.split(":")[:2]
+        return int(h) * 60 + int(m)
+    except ValueError:
+        return None
+
+
+def _hour_profile(conn, asof):
+    """Her typical Body Battery and stress for each hour of the day.
+
+    Built from the 30 days before `asof` (never `asof` itself, so today cannot
+    define its own normal). This is what makes an evening reading judgeable: a
+    Body Battery of 24 is alarming at 8am and completely ordinary at 6pm.
+    """
+    hit = _PROFILE_CACHE.get(asof)
+    if hit and (dt.datetime.now() - hit[0]).total_seconds() < _PROFILE_TTL:
+        return hit[1]
+    since = (dt.date.fromisoformat(asof) - dt.timedelta(days=BASELINE_DAYS)).isoformat()
+    rows = conn.execute(
+        "SELECT minute, body_battery, stress FROM intraday WHERE date >= ? AND date < ?",
+        (since, asof)).fetchall()
+    buckets = {}
+    for r in rows:
+        b = buckets.setdefault(r["minute"] // 60, {"bb": [], "stress": []})
+        if r["body_battery"] is not None:
+            b["bb"].append(r["body_battery"])
+        if r["stress"] is not None:
+            b["stress"].append(r["stress"])
+    prof = {}
+    for h, b in buckets.items():
+        prof[h] = {
+            "bb": _median(b["bb"]), "bb_sd": _spread(b["bb"], floor=6.0),
+            "stress": _median(b["stress"]), "stress_sd": _spread(b["stress"], floor=8.0),
+            "n": len(b["bb"]),
+        }
+    _PROFILE_CACHE[asof] = (dt.datetime.now(), prof)
+    return prof
+
+
+def _profile_at(prof, minute):
+    """Profile for a minute, interpolating over an hour we happen to have no data for."""
+    h = int(minute) // 60
+    for step in range(0, 4):
+        for cand in ((h - step) % 24, (h + step) % 24):
+            p = prof.get(cand)
+            if p and p["n"] >= 20:
+                return p
+    return None
+
+
+def _intraday_state(conn, date, at_minute):
+    """Body Battery / stress as of `at_minute`, projecting forward if need be.
+
+    The watch only syncs periodically, so the newest sample is usually behind the
+    clock, and asking about a run later today means asking about a time that has
+    not happened. Both cases are handled by carrying the last real reading along
+    her typical shape for the hours in between, and both are flagged as such.
+    """
+    rows = conn.execute(
+        "SELECT minute, body_battery, stress FROM intraday WHERE date = ? ORDER BY minute",
+        (date,)).fetchall()
+    if not rows:
+        return None
+    bb = [r for r in rows if r["body_battery"] is not None]
+    if not bb:
+        return None
+    seen = [r for r in bb if r["minute"] <= at_minute] or [bb[0]]
+    last, peak = seen[-1], max(seen, key=lambda r: r["body_battery"])
+    st = [r["stress"] for r in rows
+          if r["stress"] is not None and last["minute"] - 120 <= r["minute"] <= last["minute"]]
+
+    out = {
+        "level": last["body_battery"],
+        "sample_minute": last["minute"],
+        "peak": peak["body_battery"],
+        "peak_minute": peak["minute"],
+        "stress": round(statistics.mean(st)) if st else None,
+        "gap_min": max(0, int(at_minute) - last["minute"]),
+        "projected": False,
+    }
+    # More than 45 min of unobserved day: walk the level along her usual curve
+    # rather than pretending the last reading still holds.
+    if out["gap_min"] > 45:
+        prof = _hour_profile(conn, date)
+        a, b = _profile_at(prof, last["minute"]), _profile_at(prof, at_minute)
+        if a and b and a["bb"] is not None and b["bb"] is not None:
+            out["level"] = max(0, min(100, round(last["body_battery"] + (b["bb"] - a["bb"]))))
+            out["stress"] = round(b["stress"]) if b["stress"] is not None else out["stress"]
+            out["projected"] = True
+    return out
+
+
 # ---------- readiness ----------
 # Readiness is scored against Lexie's OWN distribution, not textbook absolutes.
 # The earlier version started at 100 and only subtracted on fixed cliffs
@@ -43,7 +167,12 @@ def _median(vals):
 # fired: 20 of 22 days scored exactly 100, including a 5.5h night. Each signal
 # now returns a continuous 0-1 quality vs her personal baseline, so a genuinely
 # average day lands in the 70s and there is headroom in both directions.
-WEIGHTS = {"sleep": 30, "debt": 15, "rhr": 25, "battery": 12, "stress": 8, "load": 10}
+#
+# Weights: sleep and resting HR still lead, because they set what the day starts
+# with, but the two time-of-day signals (what is left in the tank, how wound up
+# she is right now) carry more than they used to -- they are the difference
+# between a 7am score and a 5:30pm one.
+WEIGHTS = {"sleep": 27, "debt": 12, "rhr": 21, "battery": 18, "stress": 12, "load": 10}
 
 
 def _ramp(x, lo, hi):
@@ -65,14 +194,21 @@ def _spread(series, floor=1.0):
     return max(floor, 1.4826 * mad)
 
 
-def readiness(conn, asof=None):
+def readiness(conn, asof=None, at=None):
     """0-100 readiness vs personal baselines, with plain-language reasons.
 
     `asof` (YYYY-MM-DD) scores a past day using only data available up to that
     date, so a completed run can be judged against the readiness she actually
-    had that morning.
+    had. `at` ('HH:MM', a timestamp, or minutes past midnight) scores a specific
+    moment of that day: sleep and resting HR are fixed by morning, but Body
+    Battery and stress are read as of that time, so the answer to "am I ready"
+    changes between breakfast and an evening run the way the body does.
     """
     asof = asof or dt.date.today().isoformat()
+    today_iso = dt.date.today().isoformat()
+    at_min = _to_minute(at)
+    if at_min is None:
+        at_min = _now_minute() if asof == today_iso else 23 * 60 + 59
     since = (dt.date.fromisoformat(asof) - dt.timedelta(days=60)).isoformat()
     daily = _rows(conn, "SELECT * FROM daily WHERE date >= ? AND date <= ? ORDER BY date", (since, asof))
     sleep = _rows(conn, "SELECT * FROM sleep WHERE date >= ? AND date <= ? ORDER BY date", (since, asof))
@@ -142,24 +278,83 @@ def readiness(conn, asof=None):
         else:
             reasons.append(f"Resting HR {today_rhr} sits at or under baseline ({base_rhr:.0f}) -- well recovered.")
 
-    # --- Morning body battery (was collected but never used) ---
-    bb = today_row["body_battery_high"] if today_row else None
-    if bb:
-        parts["battery"] = _ramp(bb, 35, 90)
-        if bb < 55:
-            reasons.append(f"Body Battery only recharged to {bb} overnight.")
+    # --- Body Battery: what is left in the tank AT `at_min`, not at wake ---
+    # Two readings of the same number. Against her own curve for this hour, it
+    # says whether the day has cost her more than usual; on an absolute scale it
+    # says how much is actually there to spend. A normal evening is genuinely
+    # less ready than a normal morning, and the absolute half is what keeps that
+    # honest instead of grading every 6pm against other 6pms and calling it fine.
+    prof = _hour_profile(conn, asof)
+    state = _intraday_state(conn, asof, at_min)
+    bb_overnight = today_row["body_battery_high"] if today_row else None
+    if state:
+        lvl = state["level"]
+        pref = _profile_at(prof, at_min)
+        absolute = _ramp(lvl, 5, 70)
+        if pref and pref["bb"] is not None and pref["bb_sd"]:
+            z = (lvl - pref["bb"]) / pref["bb_sd"]
+            parts["battery"] = 0.55 * _ramp(z, -1.5, 1.0) + 0.45 * absolute
+            typical = f", where you are usually near {pref['bb']:.0f} at this hour"
+        else:
+            parts["battery"] = absolute
+            typical = ""
+        drop = max(0, state["peak"] - lvl)
+        # "Low" has to mean low FOR THIS HOUR. Being in the low 20s by an evening
+        # run is routine here, so calling that empty every day would be noise; it
+        # only earns a warning when it is also under her own curve.
+        below = bool(pref and pref["bb"] is not None
+                     and lvl < pref["bb"] - (pref["bb_sd"] or 8))
+        if below and lvl < 25:
+            reasons.append(f"Body Battery is down to {lvl} at {_hhmm(at_min)}, under your usual "
+                           f"{pref['bb']:.0f} for this hour and {drop} off today's peak of {state['peak']}. "
+                           "There is not much left to spend: make this an easy effort or move the session.")
+            flags.append("battery spent")
+        elif below:
+            reasons.append(f"Body Battery {lvl} at {_hhmm(at_min)} is below your usual "
+                           f"{pref['bb']:.0f} for this time of day: today has taken more out of you than most.")
+            flags.append("drained day")
+        elif lvl < 20:
+            reasons.append(f"Body Battery reads {lvl} at {_hhmm(at_min)}{typical}, so the tank is "
+                           "genuinely low, even if that is ordinary for you this late. "
+                           "Fine for easy miles; a hard session would be running on fumes.")
+        elif drop >= 45:
+            reasons.append(f"Body Battery has fallen {drop} points since this morning's {state['peak']} "
+                           f"and reads {lvl} at {_hhmm(at_min)}{typical}. Normal for the hour, but it is "
+                           "not the body you had at breakfast.")
+        else:
+            reasons.append(f"Body Battery {lvl} at {_hhmm(at_min)}{typical}.")
+    elif bb_overnight:
+        # no within-day curve (watch not synced, or older history): fall back to
+        # the overnight peak, which is all the daily summary knows
+        parts["battery"] = _ramp(bb_overnight, 35, 90)
+        if bb_overnight < 55:
+            reasons.append(f"Body Battery only recharged to {bb_overnight} overnight.")
             flags.append("low battery")
 
-    # --- Stress vs her own spread (not a fixed +12) ---
-    stress_series = [d["avg_stress"] for d in daily if d["avg_stress"]]
-    cur_stress = today_row["avg_stress"] if today_row else None
-    s_med, s_sd = _median(stress_series[:-1]), _spread(stress_series[:-1], floor=3.0)
-    if cur_stress and s_med and s_sd:
-        z = (cur_stress - s_med) / s_sd
-        parts["stress"] = 1.0 - _ramp(z, -0.5, 2.0)
+    # --- Stress in the last couple of hours, vs her own norm for this hour ---
+    cur_stress = state["stress"] if state else None
+    pref = _profile_at(prof, at_min) if state else None
+    if cur_stress is not None and pref and pref["stress"] is not None and pref["stress_sd"]:
+        z = (cur_stress - pref["stress"]) / pref["stress_sd"]
+        parts["stress"] = 1.0 - _ramp(z, -1.0, 2.0)
         if z >= 1.0:
-            reasons.append(f"All-day stress ({cur_stress}) is running above your norm ({s_med:.0f}).")
+            reasons.append(f"Stress has been running at {cur_stress} into {_hhmm(at_min)}, "
+                           f"above your usual {pref['stress']:.0f} for this hour. "
+                           "Warm up longer than feels necessary and let the first mile be slow.")
             flags.append("high stress")
+        elif z <= -0.8:
+            reasons.append(f"Stress is low for this time of day ({cur_stress} vs your usual {pref['stress']:.0f}).")
+    else:
+        # fall back to the day's average stress against her day-average baseline
+        stress_series = [d["avg_stress"] for d in daily if d["avg_stress"]]
+        day_stress = today_row["avg_stress"] if today_row else None
+        s_med, s_sd = _median(stress_series[:-1]), _spread(stress_series[:-1], floor=3.0)
+        if day_stress and s_med and s_sd:
+            z = (day_stress - s_med) / s_sd
+            parts["stress"] = 1.0 - _ramp(z, -0.5, 2.0)
+            if z >= 1.0:
+                reasons.append(f"All-day stress ({day_stress}) is running above your norm ({s_med:.0f}).")
+                flags.append("high stress")
 
     # --- Acute training load: last 3 days of running ---
     d0 = dt.date.fromisoformat(asof)
@@ -216,7 +411,89 @@ def readiness(conn, asof=None):
         "last_sleep_hours": round(last_hrs, 1) if last_hrs else None,
         "sleep_need": round(need, 1),
         "date": asof,
+        # which moment of the day this score describes
+        "at_minute": at_min,
+        "at_label": _hhmm(at_min),
+        "body_battery": state["level"] if state else bb_overnight,
+        "body_battery_peak": state["peak"] if state else bb_overnight,
+        "stress_now": state["stress"] if state else None,
+        "projected": bool(state and state["projected"]),
+        "synced_at": _hhmm(state["sample_minute"]) if state else None,
+        "stale_min": state["gap_min"] if state else None,
     }
+
+
+def usual_run_minute(conn, date):
+    """The time of day she actually runs on this weekday, from her own history.
+
+    Her start times are strongly bimodal: weekday sessions go out around 5-6pm,
+    weekend ones mid-morning. A single median across all runs would land in the
+    early afternoon and describe no run she has ever done, so this matches the
+    weekday first and only falls back to the weekday/weekend split.
+    """
+    rows = conn.execute(
+        "SELECT start_local FROM activities WHERE type LIKE '%running%' AND start_local IS NOT NULL "
+        "AND date >= ? ORDER BY start_local", (TRAINING_START,)).fetchall()
+    same, group = [], []
+    weekend = date.weekday() >= 5
+    for r in rows:
+        try:
+            d = dt.datetime.strptime(r["start_local"], "%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
+            continue
+        m = d.hour * 60 + d.minute
+        if d.weekday() == date.weekday():
+            same.append(m)
+        if (d.weekday() >= 5) == weekend:
+            group.append(m)
+    for series, need in ((same, 3), (group, 3)):
+        if len(series) >= need:
+            return int(statistics.median(series))
+    return None
+
+
+def day_outlook(conn):
+    """How readiness moves across today: at wake, right now, and at run time.
+
+    A morning number answers the wrong question when the run is twelve hours
+    away. This scores the same day three times so the dashboard can show what
+    the day has already cost and what is likely left by the time she laces up.
+    """
+    today = dt.date.today()
+    iso = today.isoformat()
+    now_min = _now_minute()
+    out = {}
+
+    state = _intraday_state(conn, iso, now_min)
+    # her Body Battery peaks as she wakes, which makes it a decent wake-up clock
+    wake = state["peak_minute"] if state else 7 * 60
+    if wake <= now_min - 45:
+        m = readiness(conn, asof=iso, at=wake)
+        out["morning"] = {"score": m["score"], "label": m["label"], "at_label": _hhmm(wake),
+                          "body_battery": m["body_battery"]}
+
+    # Today's session, honouring a reschedule that moved something onto today.
+    due = next((w for w in planmod.plan_with_actuals(conn)
+                if (w.get("moved_to") or w["date"]) == iso), None)
+    if due and due.get("status") == "done":
+        out["workout"] = {"summary": due["summary"], "status": "done"}
+        return out
+    if not due or not due.get("planned_miles"):
+        return out
+
+    run_min = usual_run_minute(conn, today)
+    # only worth projecting if the run is still meaningfully ahead of the clock
+    if run_min is not None and run_min > now_min + 30:
+        r = readiness(conn, asof=iso, at=run_min)
+        out["at_run"] = {
+            "score": r["score"], "label": r["label"], "verdict": r["verdict"],
+            "at_label": _hhmm(run_min), "body_battery": r["body_battery"],
+            "flags": r["flags"], "projected": True,
+        }
+    out["workout"] = {"summary": due["summary"], "type": due["type"],
+                      "miles": due["planned_miles"], "status": due.get("status"),
+                      "at_label": _hhmm(run_min) if run_min is not None else None}
+    return out
 
 
 # ---------- weekly load ----------
@@ -324,13 +601,19 @@ def evaluation_context(conn):
     return {"conditions": cond, "cohorts": cohorts, "readiness_cache": {}}
 
 
-def _readiness_on(conn, ctx, date):
-    if date not in ctx["readiness_cache"]:
+def _readiness_on(conn, ctx, date, at=None):
+    """Readiness for a past run, scored at the hour that run actually started.
+
+    An evening run judged against its own morning score was being credited with
+    a freshness she no longer had by the time she went out.
+    """
+    key = (date, _to_minute(at))
+    if key not in ctx["readiness_cache"]:
         try:
-            ctx["readiness_cache"][date] = readiness(conn, asof=date)
+            ctx["readiness_cache"][key] = readiness(conn, asof=date, at=at)
         except Exception:
-            ctx["readiness_cache"][date] = None
-    return ctx["readiness_cache"][date]
+            ctx["readiness_cache"][key] = None
+    return ctx["readiness_cache"][key]
 
 
 def _fmt_pace(p):
@@ -461,17 +744,21 @@ def evaluate(w, conn=None, ctx=None):
     elif ei:
         points.append("First run of this type in the plan, so there is nothing to compare it against yet. It becomes the baseline.")
 
-    # --- 5. readiness she actually had that morning ---
-    ready = _readiness_on(conn, ctx, date) if conn is not None and ctx is not None else None
+    # --- 5. readiness she actually had when she started this run ---
+    # Scored at the run's own start time, not at wake: a 6pm run begins on a body
+    # that has already spent the day, and judging it against breakfast flattered it.
+    started = a.get("start_local")
+    ready = _readiness_on(conn, ctx, date, at=started) if conn is not None and ctx is not None else None
+    when = f" by the time you started ({ready['at_label']})" if ready and started else " that day"
     if ready:
         rs = ready["score"]
         if rs < 65 and rating in ("breakthrough", "strong", "solid"):
-            points.append(f"Worth noting: readiness that morning was only {rs} ({ready['label']}) -- "
+            points.append(f"Worth noting: readiness was only {rs} ({ready['label']}){when} -- "
                           f"{', '.join(ready['flags']) if ready['flags'] else 'recovery signals were down'}. "
                           "Running this well on a depleted body counts for more, not less.")
             rating = "gutsy"
         elif rs < 65 and rating in ("flat", "short", "ran-hot"):
-            points.append(f"Readiness was {rs} ({ready['label']}) that morning"
+            points.append(f"Readiness was {rs} ({ready['label']}){when}"
                           + (f" -- {', '.join(ready['flags'])}" if ready['flags'] else "")
                           + ". This is the honest reason the run felt like work, and it is not a fitness problem.")
         elif rs >= 85 and rating == "flat":
@@ -557,13 +844,20 @@ def adjustments(conn):
 
     upcoming = [w for w in plan if today.isoformat() <= w["date"] <= (today + dt.timedelta(days=7)).isoformat()]
 
-    # 1) Low readiness + a hard session today/tomorrow
-    if ready["score"] < 55:
-        for w in upcoming[:2]:
-            if w["type"] in HARD_TYPES:
-                out.append({"severity": "high", "date": w["date"],
-                    "text": f"Readiness is low ({ready['score']}) and {w['date']} is a {w['type']} day ({w['planned_miles']} mi). Consider swapping it for an easy run or rest, and moving the quality session later in the week."})
-                break
+    # 1) Low readiness + a hard session today/tomorrow. Today's session is judged
+    #    at the hour she usually runs, since that is the body doing the workout.
+    run_min = usual_run_minute(conn, today)
+    at_run = readiness(conn, at=run_min) if run_min and run_min > _now_minute() + 30 else ready
+    for w in upcoming[:2]:
+        if w["type"] not in HARD_TYPES:
+            continue
+        r = at_run if w["date"] == today.isoformat() else ready
+        if r["score"] < 55:
+            when = (f"By {r['at_label']}, when you usually run, readiness projects to {r['score']}"
+                    if r is at_run and r is not ready else f"Readiness is low ({r['score']})")
+            out.append({"severity": "high", "date": w["date"],
+                "text": f"{when} and {w['date']} is a {w['type']} day ({w['planned_miles']} mi). Consider swapping it for an easy run or rest, and moving the quality session later in the week."})
+        break
 
     # 2) Scheduling conflicts (blocked dates)
     for w in upcoming:

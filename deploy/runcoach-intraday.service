@@ -1,0 +1,10 @@
+[Unit]
+Description=RunCoach Body Battery / stress refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/runcoach
+# One API call for today's curve, so readiness can be scored for right now
+ExecStart=%h/runcoach/venv/bin/python ingest.py --intraday

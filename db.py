@@ -34,6 +34,17 @@ CREATE TABLE IF NOT EXISTS sleep (
     updated_at      TEXT DEFAULT (datetime('now'))
 );
 
+-- Within-day Body Battery and stress samples (~3 min apart, straight off the
+-- watch). Daily peaks and averages cannot answer "what have I got left at
+-- 5:30pm", which is when the run actually happens, so readiness reads from here.
+CREATE TABLE IF NOT EXISTS intraday (
+    date            TEXT NOT NULL,      -- local calendar date
+    minute          INTEGER NOT NULL,   -- minutes past local midnight
+    body_battery    INTEGER,
+    stress          INTEGER,            -- Garmin's -1/-2 "unmeasurable" stored as NULL
+    PRIMARY KEY (date, minute)
+);
+
 CREATE TABLE IF NOT EXISTS activities (
     activity_id     INTEGER PRIMARY KEY,
     start_local     TEXT,               -- 'YYYY-MM-DD HH:MM:SS'

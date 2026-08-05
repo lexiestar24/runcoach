@@ -1,0 +1,11 @@
+[Unit]
+Description=Keep RunCoach's within-day recovery data fresh
+
+[Timer]
+# Every 20 minutes through the waking day. Readiness is scored for the moment
+# you are about to run, which the once-a-day sync cannot keep up with.
+OnCalendar=*-*-* 06..22:00/20:00
+Persistent=false
+
+[Install]
+WantedBy=timers.target

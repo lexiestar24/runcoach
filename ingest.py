@@ -80,6 +80,54 @@ def upsert_sleep(conn, date, dto):
     )
 
 
+def upsert_intraday(conn, payload):
+    """Store the within-day Body Battery / stress curve from get_stress_data().
+
+    One call returns both series on the same 3-minute timestamps. Garmin encodes
+    "could not measure" as a negative stress value; that is stored as NULL rather
+    than as a very calm minute. Rows are keyed by the sample's own local date, so
+    a reading that lands either side of midnight is filed on the right day.
+    """
+    if not payload:
+        return 0
+    rows = {}
+    for ts, val in (payload.get("stressValuesArray") or []):
+        d = dt.datetime.fromtimestamp(ts / 1000)
+        rows.setdefault((d.strftime("%Y-%m-%d"), d.hour * 60 + d.minute), [None, None])[1] = \
+            (val if isinstance(val, (int, float)) and val >= 0 else None)
+    for entry in (payload.get("bodyBatteryValuesArray") or []):
+        # [timestamp, status, level, version]; older firmware omits the version
+        if len(entry) < 3:
+            continue
+        ts, level = entry[0], entry[2]
+        d = dt.datetime.fromtimestamp(ts / 1000)
+        rows.setdefault((d.strftime("%Y-%m-%d"), d.hour * 60 + d.minute), [None, None])[0] = _num(level)
+
+    conn.executemany(
+        """INSERT INTO intraday (date, minute, body_battery, stress) VALUES (?,?,?,?)
+           ON CONFLICT(date, minute) DO UPDATE SET
+                body_battery=COALESCE(excluded.body_battery, body_battery),
+                stress=COALESCE(excluded.stress, stress)""",
+        [(d, m, v[0], v[1]) for (d, m), v in rows.items()],
+    )
+    return len(rows)
+
+
+def sync_intraday(g, conn, dates):
+    """Fetch the Body Battery / stress curve for each date. Never fatal."""
+    total = 0
+    for d in dates:
+        try:
+            total += upsert_intraday(conn, g.get_stress_data(d) or {})
+        except Exception as e:
+            print(f"  intraday {d}: {e}", file=sys.stderr)
+    # 60 days is well past what any baseline looks at; drop the rest
+    cutoff = (dt.date.today() - dt.timedelta(days=60)).isoformat()
+    conn.execute("DELETE FROM intraday WHERE date < ?", (cutoff,))
+    conn.commit()
+    return total
+
+
 def upsert_activity(conn, a):
     start = a.get("startTimeLocal")
     date = start.split(" ")[0] if start else None
@@ -124,6 +172,21 @@ def upsert_activity(conn, a):
     )
 
 
+def run_intraday(days=1):
+    """Just today's Body Battery / stress curve: one API call, runs often.
+
+    Readiness is scored for the moment you are about to run, so the curve has to
+    be fresher than the 06:15 daily sync can keep it.
+    """
+    db.init_db()
+    g = _login()
+    conn = db.connect()
+    today = dt.date.today()
+    n = sync_intraday(g, conn, [(today - dt.timedelta(days=i)).isoformat() for i in range(days)])
+    conn.close()
+    print(f"Intraday sync: {n} samples over {days} day(s).")
+
+
 def run(days=3, activities_count=30):
     db.init_db()
     g = _login()
@@ -145,6 +208,13 @@ def run(days=3, activities_count=30):
         conn.commit()
         if days > 5:
             time.sleep(0.6)  # be gentle on backfill
+
+    # Within-day Body Battery / stress curves for the same span
+    try:
+        n = sync_intraday(g, conn, [(today - dt.timedelta(days=i)).isoformat() for i in range(days)])
+        print(f"  intraday: {n} samples")
+    except Exception as e:
+        print(f"  intraday: {e}", file=sys.stderr)
 
     # Activities
     try:
@@ -168,7 +238,13 @@ def run(days=3, activities_count=30):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--days", type=int, default=3)
+    ap.add_argument("--days", type=int, default=None)
     ap.add_argument("--activities", type=int, default=30)
+    ap.add_argument("--intraday", action="store_true",
+                    help="only refresh the Body Battery / stress curve (cheap, runs often)")
     args = ap.parse_args()
-    run(days=args.days, activities_count=args.activities)
+    if args.intraday:
+        # today only unless asked otherwise: this runs every 20 minutes
+        run_intraday(days=args.days or 1)
+    else:
+        run(days=args.days or 3, activities_count=args.activities)

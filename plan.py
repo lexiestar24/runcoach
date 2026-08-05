@@ -144,6 +144,7 @@ def plan_with_actuals(conn):
             item["actual"] = {
                 "activity_id": actual["activity_id"],
                 "date": actual["date"],
+                "start_local": actual["start_local"],   # readiness is scored at this hour
                 "distance_m": actual["distance_m"],
                 "duration_s": actual["duration_s"],
                 "distance_mi": round((actual["distance_m"] or 0) / MILE_M, 2),

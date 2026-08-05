@@ -25,6 +25,7 @@ def dashboard():
         data = {
             "generated_at": dt.datetime.now().isoformat(timespec="seconds"),
             "readiness": engine.readiness(conn),
+            "outlook": engine.day_outlook(conn),
             "weekly": engine.weekly_load(conn),
             "milestones": engine.milestones(conn),
             "tips": engine.tips(conn),
