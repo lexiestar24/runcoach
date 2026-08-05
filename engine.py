@@ -374,17 +374,30 @@ def readiness(conn, asof=None, at=None):
     else:
         score = 70  # no data: assume neutral rather than perfect
 
-    # Acute constraint: a bad night is not merely one weighted input, it caps the
-    # day. Lexie's felt experience tracks sleep more tightly than anything else,
-    # so a 5.5h night must not get averaged away against an excellent resting HR.
-    ceiling = 100
+    # Acute constraints. A signal this bad is not merely one input to average
+    # away against an excellent resting HR: it caps the day.
+    caps = []
     if parts.get("sleep") is not None and parts["sleep"] < 0.55:
-        ceiling = min(ceiling, round(50 + 60 * parts["sleep"]))
+        caps.append((round(50 + 60 * parts["sleep"]),
+                     "Other signals look fine, but that is capped by how little you actually slept -- "
+                     "the rest of the body hasn't caught up with it yet."))
     if parts.get("rhr") is not None and parts["rhr"] < 0.45:
-        ceiling = min(ceiling, round(45 + 70 * parts["rhr"]))
+        caps.append((round(45 + 70 * parts["rhr"]),
+                     "That is capped by a resting heart rate this far over baseline, which is the "
+                     "clearest signal there is that recovery is unfinished."))
+    # A day already spent cannot read as a fresh one. Being above your own curve
+    # for 5pm is genuinely good news, but it is still 5pm: five-sixths of the
+    # day's Body Battery is gone and the morning's numbers cannot buy it back.
+    # Without this, a great evening scored the same as a great breakfast.
+    if state and state["level"] is not None:
+        caps.append((round(70 + 30 * _ramp(state["level"], 10, 60)),
+                     f"Scored for {_hhmm(at_min)}, not for this morning: with Body Battery at "
+                     f"{state['level']} you are working with what the day has left you, however good "
+                     "the overnight numbers were."))
+    ceiling = min([c[0] for c in caps], default=100)
     if score > ceiling:
+        reasons.append(min(caps, key=lambda c: c[0])[1])
         score = ceiling
-        reasons.append("Other signals look fine, but that is capped by how little you actually slept -- the rest of the body hasn't caught up with it yet.")
     score = max(0, min(100, score))
 
     if score >= 88:
@@ -610,7 +623,14 @@ def _readiness_on(conn, ctx, date, at=None):
     key = (date, _to_minute(at))
     if key not in ctx["readiness_cache"]:
         try:
-            ctx["readiness_cache"][key] = readiness(conn, asof=date, at=at)
+            r = readiness(conn, asof=date, at=at)
+            # Also score that morning, so an evening run can be read against the
+            # freshness it started from rather than against nothing.
+            st = _intraday_state(conn, date, 23 * 60 + 59)
+            if st and _to_minute(at) and st["peak_minute"] < _to_minute(at) - 45:
+                m = readiness(conn, asof=date, at=st["peak_minute"])
+                r["morning_score"], r["morning_at"] = m["score"], _hhmm(st["peak_minute"])
+            ctx["readiness_cache"][key] = r
         except Exception:
             ctx["readiness_cache"][key] = None
     return ctx["readiness_cache"][key]
@@ -749,23 +769,32 @@ def evaluate(w, conn=None, ctx=None):
     # that has already spent the day, and judging it against breakfast flattered it.
     started = a.get("start_local")
     ready = _readiness_on(conn, ctx, date, at=started) if conn is not None and ctx is not None else None
-    when = f" by the time you started ({ready['at_label']})" if ready and started else " that day"
+    when = f" at {ready['at_label']}, when you set off," if ready and started else " that day"
+    # how much the day had already taken before the run: the point of scoring at
+    # the start line rather than at breakfast
+    fell = (f", down from {ready['morning_score']} at {ready['morning_at']}"
+            if ready and ready.get("morning_score") and ready["morning_score"] - ready["score"] >= 4 else "")
     if ready:
         rs = ready["score"]
         if rs < 65 and rating in ("breakthrough", "strong", "solid"):
-            points.append(f"Worth noting: readiness was only {rs} ({ready['label']}){when} -- "
+            points.append(f"Worth noting: readiness{when} was only {rs} ({ready['label']}){fell} -- "
                           f"{', '.join(ready['flags']) if ready['flags'] else 'recovery signals were down'}. "
                           "Running this well on a depleted body counts for more, not less.")
             rating = "gutsy"
         elif rs < 65 and rating in ("flat", "short", "ran-hot"):
-            points.append(f"Readiness was {rs} ({ready['label']}){when}"
+            points.append(f"Readiness{when} was {rs} ({ready['label']}){fell}"
                           + (f" -- {', '.join(ready['flags'])}" if ready['flags'] else "")
                           + ". This is the honest reason the run felt like work, and it is not a fitness problem.")
         elif rs >= 85 and rating == "flat":
-            points.append(f"Readiness was high that day ({rs}), so the dip is not recovery. "
+            points.append(f"Readiness{when} was still high ({rs}){fell}, so the dip is not recovery. "
                           "More likely conditions, fuelling, or simply a flat day -- everyone gets them.")
         elif rs >= 85:
-            points.append(f"You went in fresh (readiness {rs}) and used it well.")
+            points.append(f"Readiness{when} was {rs}{fell}: "
+                          + ("still plenty in the tank, and you used it well."
+                             if fell else "you went in fresh and used it well."))
+        elif rs >= 72:
+            points.append(f"Readiness{when} was {rs} ({ready['label']}){fell}. A normal working body rather "
+                          "than a fresh one, which is what most training actually happens on.")
 
     if a.get("max_hr") and not hard and a["max_hr"] >= 186:
         points.append(f"Max HR touched {a['max_hr']:.0f}, likely a hill or a surge near the end.")
@@ -782,7 +811,9 @@ def evaluate(w, conn=None, ctx=None):
     }.get(rating, "Nice work.")
     return {"rating": rating, "headline": headline, "points": points,
             "comparison": comparison, "conditions": cond or None,
-            "readiness_that_day": ready["score"] if ready else None}
+            "readiness_that_day": ready["score"] if ready else None,
+            "readiness_at": ready["at_label"] if (ready and started) else None,
+            "readiness_morning": ready.get("morning_score") if ready else None}
 
 
 # ---------- tips ----------

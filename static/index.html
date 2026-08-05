@@ -815,14 +815,17 @@ function openDetail(i){
     // coaching evaluation of the completed run
     if(w.evaluation){const ev=w.evaluation;
       // at-a-glance chips: where this sat among runs of the same kind, the
-      // weather it was run in, and how recovered she was that morning
+      // weather it was run in, and how recovered she was when she set off
       const chips=[];
       if(ev.comparison){const c=ev.comparison;
         chips.push(`#${c.rank} of ${c.n_peers+1} ${c.type} runs`);
         chips.push(`${c.pct_vs_median>=0?'+':''}${c.pct_vs_median}% vs your median`);}
       if(ev.conditions) chips.push(ev.conditions.indoor?'treadmill':
         `${Math.round(ev.conditions.temp_f)}°F, dew ${Math.round(ev.conditions.dew_f)}°`);
-      if(ev.readiness_that_day!=null) chips.push(`readiness ${ev.readiness_that_day}`);
+      // always name the hour: this is readiness at the start line, not at breakfast
+      if(ev.readiness_that_day!=null) chips.push(
+        `readiness ${ev.readiness_that_day}${ev.readiness_at?` at ${ev.readiness_at}`:''}`
+        +(ev.readiness_morning?` (${ev.readiness_morning} that morning)`:''));
       sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Evaluation'}),
         el('div',{class:`eval ${ev.rating}`},[
           el('div',{class:'eval-h',text:ev.headline}),
