@@ -86,10 +86,29 @@ def _hour_profile(conn, asof):
         return hit[1]
     since = (dt.date.fromisoformat(asof) - dt.timedelta(days=BASELINE_DAYS)).isoformat()
     rows = conn.execute(
-        "SELECT minute, body_battery, stress FROM intraday WHERE date >= ? AND date < ?",
+        "SELECT date, minute, body_battery, stress FROM intraday WHERE date >= ? AND date < ?",
         (since, asof)).fetchall()
+
+    # Sleeping minutes are not a fair yardstick for a waking one. Around her wake
+    # time an hour is mostly sleep, where stress sits near 10 and Body Battery is
+    # still charging, so a normal awake 5:45am was being marked as stressed and
+    # under-charged against a baseline of being unconscious.
+    asleep = {}
+    for r in conn.execute("SELECT sleep_start, sleep_end FROM sleep WHERE date >= ? AND date <= ?",
+                          (since, asof)).fetchall():
+        s, e = r["sleep_start"], r["sleep_end"]
+        if not (s and e):
+            continue
+        if s[:10] == e[:10]:
+            asleep.setdefault(s[:10], []).append((_to_minute(s), _to_minute(e)))
+        else:
+            asleep.setdefault(s[:10], []).append((_to_minute(s), 24 * 60))
+            asleep.setdefault(e[:10], []).append((0, _to_minute(e)))
+
     buckets = {}
     for r in rows:
+        if any(lo <= r["minute"] <= hi for lo, hi in asleep.get(r["date"], ())):
+            continue
         b = buckets.setdefault(r["minute"] // 60, {"bb": [], "stress": []})
         if r["body_battery"] is not None:
             b["bb"].append(r["body_battery"])
@@ -115,6 +134,20 @@ def _profile_at(prof, minute):
             if p and p["n"] >= 20:
                 return p
     return None
+
+
+def _wake_minute(conn, date, fallback=None):
+    """When she actually got up, from Garmin's sleep record.
+
+    Body Battery keeps charging for a while after you wake and peaks later, so
+    using its peak as a stand-in put the morning up to an hour off.
+    """
+    row = conn.execute("SELECT sleep_end FROM sleep WHERE date = ?", (date,)).fetchone()
+    if row and row["sleep_end"] and str(row["sleep_end"]).startswith(date):
+        m = _to_minute(row["sleep_end"])
+        if m is not None:
+            return m
+    return fallback
 
 
 def _intraday_state(conn, date, at_minute):
@@ -478,8 +511,7 @@ def day_outlook(conn):
     out = {}
 
     state = _intraday_state(conn, iso, now_min)
-    # her Body Battery peaks as she wakes, which makes it a decent wake-up clock
-    wake = state["peak_minute"] if state else 7 * 60
+    wake = _wake_minute(conn, iso, state["peak_minute"] if state else 7 * 60)
     if wake <= now_min - 45:
         m = readiness(conn, asof=iso, at=wake)
         out["morning"] = {"score": m["score"], "label": m["label"], "at_label": _hhmm(wake),
@@ -627,9 +659,10 @@ def _readiness_on(conn, ctx, date, at=None):
             # Also score that morning, so an evening run can be read against the
             # freshness it started from rather than against nothing.
             st = _intraday_state(conn, date, 23 * 60 + 59)
-            if st and _to_minute(at) and st["peak_minute"] < _to_minute(at) - 45:
-                m = readiness(conn, asof=date, at=st["peak_minute"])
-                r["morning_score"], r["morning_at"] = m["score"], _hhmm(st["peak_minute"])
+            wake = _wake_minute(conn, date, st["peak_minute"] if st else None)
+            if wake is not None and _to_minute(at) and wake < _to_minute(at) - 45:
+                m = readiness(conn, asof=date, at=wake)
+                r["morning_score"], r["morning_at"] = m["score"], _hhmm(wake)
             ctx["readiness_cache"][key] = r
         except Exception:
             ctx["readiness_cache"][key] = None

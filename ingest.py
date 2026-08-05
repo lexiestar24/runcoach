@@ -52,6 +52,13 @@ def upsert_daily(conn, date, stats):
     )
 
 
+def _local_ts(ms):
+    """Garmin's epoch-millisecond timestamps as local wall-clock time."""
+    if not isinstance(ms, (int, float)):
+        return None
+    return dt.datetime.fromtimestamp(ms / 1000).strftime("%Y-%m-%d %H:%M:%S")
+
+
 def upsert_sleep(conn, date, dto):
     if not dto:
         return
@@ -59,13 +66,15 @@ def upsert_sleep(conn, date, dto):
     overall = (scores.get("overall") or {}).get("value") if isinstance(scores, dict) else None
     conn.execute(
         """INSERT INTO sleep (date, total_seconds, deep_seconds, light_seconds, rem_seconds,
-                awake_seconds, score, resp_avg, sleep_stress, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?, datetime('now'))
+                awake_seconds, score, resp_avg, sleep_stress, sleep_start, sleep_end, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
            ON CONFLICT(date) DO UPDATE SET
                 total_seconds=excluded.total_seconds, deep_seconds=excluded.deep_seconds,
                 light_seconds=excluded.light_seconds, rem_seconds=excluded.rem_seconds,
                 awake_seconds=excluded.awake_seconds, score=excluded.score,
-                resp_avg=excluded.resp_avg, sleep_stress=excluded.sleep_stress, updated_at=datetime('now')""",
+                resp_avg=excluded.resp_avg, sleep_stress=excluded.sleep_stress,
+                sleep_start=excluded.sleep_start, sleep_end=excluded.sleep_end,
+                updated_at=datetime('now')""",
         (
             date,
             _num(dto.get("sleepTimeSeconds")),
@@ -76,6 +85,8 @@ def upsert_sleep(conn, date, dto):
             _num(overall),
             _num(dto.get("averageRespirationValue")),
             _num(dto.get("avgSleepStress")),
+            _local_ts(dto.get("sleepStartTimestampGMT")),
+            _local_ts(dto.get("sleepEndTimestampGMT")),
         ),
     )
 

@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS sleep (
     score           INTEGER,            -- overall sleep score 0-100
     resp_avg        REAL,
     sleep_stress    REAL,
+    sleep_start     TEXT,               -- local 'YYYY-MM-DD HH:MM:SS'
+    sleep_end       TEXT,               -- ditto: the real wake time, not a guess
     updated_at      TEXT DEFAULT (datetime('now'))
 );
 
@@ -98,6 +100,11 @@ def init_db():
         conn.execute("ALTER TABLE activities ADD COLUMN start_lat REAL")
     if "start_lon" not in cols:
         conn.execute("ALTER TABLE activities ADD COLUMN start_lon REAL")
+    # when she actually woke, so readiness can anchor the morning to a real time
+    scols = {r[1] for r in conn.execute("PRAGMA table_info(sleep)")}
+    for c in ("sleep_start", "sleep_end"):
+        if c not in scols:
+            conn.execute(f"ALTER TABLE sleep ADD COLUMN {c} TEXT")
     conn.commit()
     conn.close()
 
