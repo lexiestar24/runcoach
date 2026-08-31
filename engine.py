@@ -9,7 +9,7 @@ import statistics
 import db
 import plan as planmod
 
-RACE_DATE = dt.date(2026, 11, 7)
+RACE_DATE = dt.date(2026, 11, 15)   # Madison Half, gun 7:00 AM
 TRAINING_START = "2026-06-22"   # plan week 1; ignore pre-plan May runs
 MILE_M = 1609.344
 HARD_TYPES = {"tempo", "interval", "long", "race"}
@@ -882,7 +882,7 @@ def tips(conn):
     m = milestones(conn)
     if m["longest_run_mi"] and m["longest_run_mi"] >= 5:
         out.append({"kind": "win", "text":
-            f"Longest run so far is {m['longest_run_mi']} mi, and you're building real endurance. {m['weeks_to_race']} weeks to the Nov 7 half."})
+            f"Longest run so far is {m['longest_run_mi']} mi, and you're building real endurance. {m['weeks_to_race']} weeks to the Madison half."})
     if m["vo2max_change"] and m["vo2max_change"] > 0:
         out.append({"kind": "win", "text":
             f"VO2max is trending up (+{m['vo2max_change']}). Aerobic fitness is responding. The slow easy miles are working."})
@@ -961,7 +961,7 @@ def adjustments(conn):
         w = recent_missed[-1]
         moved = f" (already moved from {w['date']})" if w.get("rescheduled") else ""
         out.append({"severity": "low", "date": _due(w),
-            "text": f"Missed the {_due(w)} {w['type']} ({w['planned_miles']} mi){moved}. Don't cram it back in. Just resume the schedule; one missed session won't hurt the Nov 7 goal."})
+            "text": f"Missed the {_due(w)} {w['type']} ({w['planned_miles']} mi){moved}. Don't cram it back in. Just resume the schedule; one missed session won't hurt the Madison goal."})
 
     if not out:
         out.append({"severity": "low", "date": None,

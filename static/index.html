@@ -215,6 +215,49 @@
   .loading{color:var(--muted);text-align:center;padding:60px 0}
   .err{color:var(--critical);text-align:center;padding:40px 0;font-size:14px}
   @media(max-width:520px){ .tile .v{font-size:26px} .wrap{padding:12px 12px 60px} }
+  /* ---- race day ---- */
+  .racehero{display:flex;gap:22px;flex-wrap:wrap;align-items:center}
+  .racehero .big{flex:1 1 190px;min-width:170px}
+  .racehero .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+  .racehero .v{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.05;margin-top:5px;
+    font-variant-numeric:tabular-nums}
+  .racehero .v small{font-size:15px;color:var(--muted);font-weight:500;margin-left:3px}
+  .racehero .d{font-size:12.5px;color:var(--text-2);margin-top:6px;line-height:1.45}
+  .rbasis{font-size:12px;color:var(--muted);line-height:1.5;margin-top:14px;
+    border-top:1px solid var(--grid);padding-top:12px}
+  .rbasis .est{color:var(--orange);font-weight:600}
+  /* phase rows: stacked so four columns never force sideways scroll on a phone */
+  .phase{display:flex;flex-direction:column}
+  .prow{padding:12px 14px;border-bottom:1px solid var(--grid)}
+  .prow:last-child{border-bottom:none}
+  .prow .p-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .prow .p-mi{font-weight:700;font-size:15px;min-width:56px}
+  .prow .p-hr{font-size:12px;font-weight:650;padding:2px 8px;border-radius:999px;
+    background:var(--surface-2);color:var(--text-2);font-variant-numeric:tabular-nums}
+  .prow .p-talk{font-size:11.5px;color:var(--muted);margin-left:auto}
+  .prow .p-job{font-size:13.5px;color:var(--text-2);margin-top:5px;line-height:1.45}
+  .prow .p-pace{font-size:12.5px;color:var(--orange);margin-top:4px;font-weight:600}
+  .prow.p1{border-left:4px solid var(--blue)} .prow.p2{border-left:4px solid var(--green)}
+  .prow.p3{border-left:4px solid var(--orange)} .prow.p4{border-left:4px solid var(--red)}
+  /* credit breakdown */
+  details.credits{margin-top:12px}
+  details.credits > summary{cursor:pointer;font-size:12.5px;color:var(--text-2);
+    list-style:none;padding:8px 0;user-select:none}
+  details.credits > summary::-webkit-details-marker{display:none}
+  details.credits > summary::before{content:"\25B8 ";color:var(--muted)}
+  details.credits[open] > summary::before{content:"\25BE "}
+  .credrow{display:flex;gap:10px;align-items:baseline;padding:7px 0;border-top:1px solid var(--grid);font-size:13px}
+  .credrow .cl{flex:1;color:var(--text-2);line-height:1.4}
+  .credrow .cl i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
+  .credrow .cv{flex:0 0 auto;font-weight:650;color:var(--success-ink);font-variant-numeric:tabular-nums}
+  .credrow.tot .cv{color:var(--text)} .credrow.tot .cl{color:var(--text);font-weight:650}
+  /* goal-race-pace session strip */
+  .grp{display:flex;gap:8px;flex-wrap:wrap}
+  .grpc{flex:1 1 150px;background:var(--page);border:1px solid var(--border);border-radius:11px;padding:10px 12px}
+  .grpc.done{border-color:var(--good)}
+  .grpc .gd{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .grpc .gv{font-size:15px;font-weight:650;margin-top:3px;line-height:1.25}
+  .grpc .gs{font-size:12px;color:var(--text-2);margin-top:4px}
 </style>
 </head>
 <body>
@@ -548,8 +591,8 @@ function render(d){
 
   // Milestone tiles
   const tiles=[
-    ['Weeks to race',M.weeks_to_race,'Nov 7 half'],
-    ['Plan week',`${M.current_week}<small>/20</small>`,`${M.consistency_pct}% workouts done`],
+    ['Weeks to race',M.weeks_to_race,'Madison half, Nov 15'],
+    ['Plan week',`${M.current_week}<small>/21</small>`,`${M.consistency_pct}% workouts done`],
     ['Total miles',M.total_miles,`${M.total_runs} runs logged`],
     ['Longest run',`${M.longest_run_mi}<small>mi</small>`,'building endurance'],
     ['VO₂max',(M.vo2max!=null?M.vo2max:'–'), M.vo2max_change>0?`<span class="up">▲ +${M.vo2max_change}</span> recent`:(M.vo2max_change!=null?`${M.vo2max_change} recent`:'')],
@@ -561,6 +604,9 @@ function render(d){
       el('div',{class:'k',text:k}), el('div',{class:'v',html:String(v)}), el('div',{class:'d',html:dd||''})
     ])))
   ]));
+
+  // Race day: the point of the whole plan, so it sits above the week-to-week noise
+  const raceSec=renderRace(d); if(raceSec) app.appendChild(raceSec);
 
   // Adjustments
   app.appendChild(el('section',{},[
@@ -625,6 +671,91 @@ function render(d){
   app.appendChild(el('section',{},[el('h2',{text:'Schedule'}),
     el('div',{class:'card schedcard'},list)]));
 }
+
+// ---- Race day -------------------------------------------------------------
+// The projection is an estimate built from her own long runs (see race.py), so
+// the section says so out loud and shows every credit that goes into it. A
+// number she cannot interrogate is a number she will either over-trust at mile 2
+// or ignore entirely.
+function renderRace(d){
+  const R=d.race; if(!R) return null;
+  const P=R.projection||{}, kids=[];
+
+  const hero=el('div',{class:'card racehero'},[
+    el('div',{class:'big'},[
+      el('div',{class:'k',text:'Goal race pace (est.)'}),
+      el('div',{class:'v',html:P.available?`${P.central_pace_str}<small>/mi</small>`:'--'}),
+      el('div',{class:'d',text:P.available?`range ${P.band_str} /mi`:'no long runs logged yet'})]),
+    el('div',{class:'big'},[
+      el('div',{class:'k',text:'Projected finish'}),
+      el('div',{class:'v',text:P.available?P.finish_central:'--'}),
+      el('div',{class:'d',text:P.available?`range ${P.finish_band}`:''})]),
+    el('div',{class:'big'},[
+      el('div',{class:'k',text:'Race day'}),
+      el('div',{class:'v',html:`${R.days_out}<small>days</small>`}),
+      el('div',{class:'d',text:`${R.where} · gun ${R.gun_time} · Nov 15`})])]);
+
+  if(P.available){
+    const basis=el('div',{class:'rbasis'},[
+      el('span',{class:'est',text:P.measured?'MEASURED · ':'ESTIMATE · '}),
+      el('span',{text:P.basis})]);
+    const det=el('details',{class:'credits'},[
+      el('summary',{text:`How ${P.central_pace_str} is built: ${P.baseline_pace_str}/mi long-run pace, minus ${P.total_credit_sec} sec/mi`})]);
+    (P.credits||[]).forEach(c=>det.appendChild(el('div',{class:'credrow'},[
+      el('div',{class:'cl'},[el('span',{text:c.label}),el('i',{text:c.why})]),
+      el('div',{class:'cv',text:`-${c.sec_per_mi}s`})])));
+    det.appendChild(el('div',{class:'credrow tot'},[
+      el('div',{class:'cl',text:'Total credit vs your current long-run pace'}),
+      el('div',{class:'cv',text:`-${P.total_credit_sec}s`})]));
+    det.appendChild(el('div',{class:'rbasis',text:
+      `1 bpm is worth ~${P.sec_per_bpm} sec/mi for you (${P.slope_fitted?`fitted from ${P.slope_n} of your own runs`:'default, not enough data to fit yours yet'}). `+
+      `Credits are deliberately conservative: the failure mode that ruins a first half is a projection that is too fast, believed at mile 2.`}));
+    basis.appendChild(det);
+    hero.appendChild(basis);
+  }
+  kids.push(hero);
+
+  // four-phase plan
+  const ph=el('div',{class:'card schedcard'},el('div',{class:'phase'},
+    (R.phases||[]).map((p,i)=>el('div',{class:`prow p${i+1}`},[
+      el('div',{class:'p-top'},[
+        el('span',{class:'p-mi',text:`Mi ${p.miles}`}),
+        el('span',{class:'p-hr',text:`HR ${p.hr}`}),
+        el('span',{class:'p-talk',text:p.talk})]),
+      el('div',{class:'p-job',text:p.job}),
+      el('div',{class:'p-pace',text:p.pace})]))));
+
+  // goal-race-pace sessions pulled from the plan, so editing the .ics updates this
+  const grpPlan=(d.plan||[]).filter(w=>/goal race pace/i.test((w.summary||'')+' '+(w.description||'')));
+  let grpNode=null;
+  if(grpPlan.length){
+    grpNode=el('div',{class:'grp'},grpPlan.map(w=>{
+      const a=w.actual;
+      return el('div',{class:'grpc'+(a?' done':'')},[
+        el('div',{class:'gd',text:fmtDate(w.date)}),
+        el('div',{class:'gv',text:(w.summary.split(' - ')[1]||w.summary)}),
+        el('div',{class:'gs',text:a?`ran ${a.distance_mi} mi @ ${a.avg_pace_min_per_mi?fmtPace(a.avg_pace_min_per_mi):'--'} /mi, HR ${a.avg_hr||'--'}`:w.status})]);
+    }));
+  }
+
+  const notes=el('div',{class:'stack'},(R.notes||[]).map(n=>el('div',{class:`note ${n.kind==='warn'?'high':n.kind==='good'?'win':'low'}`},[
+    el('span',{class:'tag',text:n.title}), el('div',{text:n.text})])));
+
+  const sec=el('section',{},[el('h2',{text:'Race day'}),el('div',{class:'stack'},kids)]);
+  sec.appendChild(el('h2',{text:'Race pacing plan',style:'margin-top:22px'}));
+  sec.appendChild(ph);
+  if(grpNode){
+    sec.appendChild(el('h2',{text:'Goal race pace sessions',style:'margin-top:22px'}));
+    sec.appendChild(grpNode);
+    sec.appendChild(el('div',{class:'rbasis',text:
+      'These are the only sessions that teach your legs race effort on ALREADY TIRED legs, which is the only condition that matters on Nov 15. Once one is logged, the projection above switches from modelled to measured.'}));
+  }
+  sec.appendChild(el('h2',{text:'Race day execution',style:'margin-top:22px'}));
+  sec.appendChild(notes);
+  return sec;
+}
+function fmtPace(p){const m=Math.floor(p);const s=Math.round((p-m)*60);
+  return s===60?`${m+1}:00`:`${m}:${String(s).padStart(2,'0')}`;}
 const scoreColor=s=>s>=72?'--good':s>=55?'--warning':'--critical';
 
 // The readiness score is only true for one moment, so name it. If the watch has

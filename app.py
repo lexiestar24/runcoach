@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 import db
 import engine
 import plan as planmod
+import race as racemod
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 app = FastAPI(title="RunCoach")
@@ -33,6 +34,9 @@ def dashboard():
             "series": engine.series(conn),
             "plan": planmod.plan_with_actuals(conn),
         }
+        # race day is built from the plan we just resolved, so goal-race-pace
+        # sessions can be matched to their actuals without a second parse
+        data["race"] = racemod.summary(conn, data["plan"])
         ctx = engine.evaluation_context(conn)
         for w in data["plan"]:
             if w.get("actual"):
