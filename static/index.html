@@ -251,6 +251,16 @@
   .credrow .cl i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
   .credrow .cv{flex:0 0 auto;font-weight:650;color:var(--success-ink);font-variant-numeric:tabular-nums}
   .credrow.tot .cv{color:var(--text)} .credrow.tot .cl{color:var(--text);font-weight:650}
+  /* race summary card + its details sheet */
+  .racecard{display:flex;flex-direction:column;gap:14px}
+  .racecard .rc-head{font-size:12.5px;color:var(--text-2)}
+  .racecard .rc-nums{display:flex;gap:22px;flex-wrap:wrap}
+  .racecard .rc-n{flex:0 1 auto}
+  .racebtn{align-self:flex-start;background:#ae5225;color:#fff;border-color:transparent;
+    padding:10px 18px;font-size:13.5px;font-weight:650;border-radius:10px}
+  .raceoverlay{z-index:60}
+  .racesheet{touch-action:auto}
+  .racesheet .rbasis{margin-top:10px}
   /* goal-race-pace session strip */
   .grp{display:flex;gap:8px;flex-wrap:wrap}
   .grpc{flex:1 1 150px;background:var(--page);border:1px solid var(--border);border-radius:11px;padding:10px 12px}
@@ -273,6 +283,7 @@
 </div>
 <div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
 <div class="overlay rsoverlay" id="rsoverlay"><div class="sheet rssheet" id="rssheet"></div></div>
+<div class="overlay raceoverlay" id="raceoverlay"><div class="sheet racesheet" id="racesheet"></div></div>
 <div class="tip" id="tip"></div>
 
 <script>
@@ -673,50 +684,44 @@ function render(d){
 }
 
 // ---- Race day -------------------------------------------------------------
-// The projection is an estimate built from her own long runs (see race.py), so
-// the section says so out loud and shows every credit that goes into it. A
-// number she cannot interrogate is a number she will either over-trust at mile 2
-// or ignore entirely.
-function renderRace(d){
-  const R=d.race; if(!R) return null;
-  const P=R.projection||{}, kids=[];
-
-  const hero=el('div',{class:'card racehero'},[
-    el('div',{class:'big'},[
-      el('div',{class:'k',text:'Goal race pace (est.)'}),
-      el('div',{class:'v',html:P.available?`${P.central_pace_str}<small>/mi</small>`:'--'}),
-      el('div',{class:'d',text:P.available?`range ${P.band_str} /mi`:'no long runs logged yet'})]),
-    el('div',{class:'big'},[
-      el('div',{class:'k',text:'Projected finish'}),
-      el('div',{class:'v',text:P.available?P.finish_central:'--'}),
-      el('div',{class:'d',text:P.available?`range ${P.finish_band}`:''})]),
-    el('div',{class:'big'},[
-      el('div',{class:'k',text:'Race day'}),
-      el('div',{class:'v',html:`${R.days_out}<small>days</small>`}),
-      el('div',{class:'d',text:`${R.where} · gun ${R.gun_time} · Nov 15`})])]);
-
-  if(P.available){
-    const basis=el('div',{class:'rbasis'},[
-      el('span',{class:'est',text:P.measured?'MEASURED · ':'ESTIMATE · '}),
-      el('span',{text:P.basis})]);
-    const det=el('details',{class:'credits'},[
-      el('summary',{text:`How ${P.central_pace_str} is built: ${P.baseline_pace_str}/mi long-run pace, minus ${P.total_credit_sec} sec/mi`})]);
-    (P.credits||[]).forEach(c=>det.appendChild(el('div',{class:'credrow'},[
-      el('div',{class:'cl'},[el('span',{text:c.label}),el('i',{text:c.why})]),
-      el('div',{class:'cv',text:`-${c.sec_per_mi}s`})])));
-    det.appendChild(el('div',{class:'credrow tot'},[
-      el('div',{class:'cl',text:'Total credit vs your current long-run pace'}),
-      el('div',{class:'cv',text:`-${P.total_credit_sec}s`})]));
-    det.appendChild(el('div',{class:'rbasis',text:
-      `1 bpm is worth ~${P.sec_per_bpm} sec/mi for you (${P.slope_fitted?`fitted from ${P.slope_n} of your own runs`:'default, not enough data to fit yours yet'}). `+
-      `Credits are deliberately conservative: the failure mode that ruins a first half is a projection that is too fast, believed at mile 2.`}));
-    basis.appendChild(det);
-    hero.appendChild(basis);
-  }
-  kids.push(hero);
-
-  // four-phase plan
-  const ph=el('div',{class:'card schedcard'},el('div',{class:'phase'},
+// The dashboard shows only the three numbers she would want at a glance; the
+// full projection, pacing plan, sessions and execution notes live behind the
+// Race details button. Race day is 10 weeks out -- it does not need to occupy
+// half the scroll every time she checks this morning's readiness.
+//
+// Each block is built by its own function so the card and the sheet can share
+// them, and the sheet is rebuilt from DATA on open rather than cached, so it is
+// never stale after a Garmin sync.
+function raceNums(R,P){
+  const n=(k,v,d)=>el('div',{class:'rc-n'},[
+    el('div',{class:'k',text:k}),el('div',{class:'v',html:v}),el('div',{class:'d',text:d||''})]);
+  return [
+    n('Goal race pace (est.)', P.available?`${P.central_pace_str}<small>/mi</small>`:'--',
+      P.available?`range ${P.band_str}`:'no long runs logged yet'),
+    n('Projected finish', P.available?P.finish_central:'--', P.available?`range ${P.finish_band}`:''),
+    n('Race day', `${R.days_out}<small>days</small>`, `gun ${R.gun_time}`)];
+}
+function raceCredits(P){
+  if(!P.available) return null;
+  const basis=el('div',{class:'rbasis'},[
+    el('span',{class:'est',text:P.measured?'MEASURED · ':'ESTIMATE · '}),
+    el('span',{text:P.basis})]);
+  const det=el('details',{class:'credits'},[
+    el('summary',{text:`How ${P.central_pace_str} is built: ${P.baseline_pace_str}/mi long-run pace, minus ${P.total_credit_sec} sec/mi`})]);
+  (P.credits||[]).forEach(c=>det.appendChild(el('div',{class:'credrow'},[
+    el('div',{class:'cl'},[el('span',{text:c.label}),el('i',{text:c.why})]),
+    el('div',{class:'cv',text:`-${c.sec_per_mi}s`})])));
+  det.appendChild(el('div',{class:'credrow tot'},[
+    el('div',{class:'cl',text:'Total credit vs your current long-run pace'}),
+    el('div',{class:'cv',text:`-${P.total_credit_sec}s`})]));
+  det.appendChild(el('div',{class:'rbasis',text:
+    `1 bpm is worth ~${P.sec_per_bpm} sec/mi for you (${P.slope_fitted?`fitted from ${P.slope_n} of your own runs`:'default, not enough data to fit yours yet'}). `+
+    `Credits are deliberately conservative: the failure mode that ruins a first half is a projection that is too fast, believed at mile 2.`}));
+  basis.appendChild(det);
+  return basis;
+}
+function racePhases(R){
+  return el('div',{class:'card schedcard'},el('div',{class:'phase'},
     (R.phases||[]).map((p,i)=>el('div',{class:`prow p${i+1}`},[
       el('div',{class:'p-top'},[
         el('span',{class:'p-mi',text:`Mi ${p.miles}`}),
@@ -724,35 +729,73 @@ function renderRace(d){
         el('span',{class:'p-talk',text:p.talk})]),
       el('div',{class:'p-job',text:p.job}),
       el('div',{class:'p-pace',text:p.pace})]))));
-
-  // goal-race-pace sessions pulled from the plan, so editing the .ics updates this
-  const grpPlan=(d.plan||[]).filter(w=>/goal race pace/i.test((w.summary||'')+' '+(w.description||'')));
-  let grpNode=null;
-  if(grpPlan.length){
-    grpNode=el('div',{class:'grp'},grpPlan.map(w=>{
-      const a=w.actual;
-      return el('div',{class:'grpc'+(a?' done':'')},[
-        el('div',{class:'gd',text:fmtDate(w.date)}),
-        el('div',{class:'gv',text:(w.summary.split(' - ')[1]||w.summary)}),
-        el('div',{class:'gs',text:a?`ran ${a.distance_mi} mi @ ${a.avg_pace_min_per_mi?fmtPace(a.avg_pace_min_per_mi):'--'} /mi, HR ${a.avg_hr||'--'}`:w.status})]);
-    }));
-  }
-
-  const notes=el('div',{class:'stack'},(R.notes||[]).map(n=>el('div',{class:`note ${n.kind==='warn'?'high':n.kind==='good'?'win':'low'}`},[
+}
+// matched on plan text, so editing the .ics is enough to change these
+function raceGrp(d){
+  const g=(d.plan||[]).filter(w=>/goal race pace/i.test((w.summary||'')+' '+(w.description||'')));
+  if(!g.length) return null;
+  return el('div',{class:'grp'},g.map(w=>{
+    const a=w.actual;
+    return el('div',{class:'grpc'+(a?' done':'')},[
+      el('div',{class:'gd',text:fmtDate(w.date)}),
+      el('div',{class:'gv',text:(w.summary.split(' - ')[1]||w.summary)}),
+      el('div',{class:'gs',text:a?`ran ${a.distance_mi} mi @ ${a.avg_pace_min_per_mi?fmtPace(a.avg_pace_min_per_mi):'--'} /mi, HR ${a.avg_hr||'--'}`:w.status})]);
+  }));
+}
+function raceNotes(R){
+  return el('div',{class:'stack'},(R.notes||[]).map(n=>el('div',{class:`note ${n.kind==='warn'?'high':n.kind==='good'?'win':'low'}`},[
     el('span',{class:'tag',text:n.title}), el('div',{text:n.text})])));
+}
 
-  const sec=el('section',{},[el('h2',{text:'Race day'}),el('div',{class:'stack'},kids)]);
-  sec.appendChild(el('h2',{text:'Race pacing plan',style:'margin-top:22px'}));
-  sec.appendChild(ph);
-  if(grpNode){
-    sec.appendChild(el('h2',{text:'Goal race pace sessions',style:'margin-top:22px'}));
-    sec.appendChild(grpNode);
-    sec.appendChild(el('div',{class:'rbasis',text:
-      'These are the only sessions that teach your legs race effort on ALREADY TIRED legs, which is the only condition that matters on Nov 15. Once one is logged, the projection above switches from modelled to measured.'}));
+function renderRace(d){
+  const R=d.race; if(!R) return null;
+  const P=R.projection||{};
+  const btn=el('button',{class:'racebtn',text:'Race details →'});
+  btn.addEventListener('click',openRaceDetails);
+  return el('section',{},[
+    el('h2',{text:'Race day'}),
+    el('div',{class:'card racecard'},[
+      el('div',{class:'rc-head',text:`Madison Half Marathon · Sun Nov 15 · ${R.where} · gun ${R.gun_time}`}),
+      el('div',{class:'rc-nums racehero'},raceNums(R,P)),
+      btn])]);
+}
+
+function openRaceDetails(){
+  const d=DATA; if(!d||!d.race) return;
+  const R=d.race, P=R.projection||{};
+  const sheet=$('#racesheet'); sheet.innerHTML='';
+  const x=el('button',{class:'closex',html:'&times;'});
+  x.addEventListener('click',closeRaceDetails);
+  sheet.appendChild(x);
+  sheet.appendChild(el('div',{class:'grab'}));
+  sheet.appendChild(el('h3',{text:'Madison Half Marathon'}));
+  sheet.appendChild(el('div',{class:'meta',
+    text:`Sunday Nov 15, 2026 · ${R.where} · gun ${R.gun_time} · ${R.days_out} days out`}));
+
+  // a block whose body could not be built is skipped rather than appended empty
+  const block=(lab,node)=>{if(!node)return;
+    sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:lab}),node]));};
+
+  const proj=el('div',{},[el('div',{class:'racehero',style:'gap:22px'},raceNums(R,P))]);
+  const cred=raceCredits(P); if(cred) proj.appendChild(cred);
+  block('Projection',proj);
+  block('Pacing plan',racePhases(R));
+
+  const grp=raceGrp(d);
+  if(grp) block('Goal race pace sessions',el('div',{},[grp,el('div',{class:'rbasis',text:
+    'These are the only sessions that teach your legs race effort on ALREADY TIRED legs, which is the only condition that matters on Nov 15. Once one is logged, the projection above switches from modelled to measured.'})]));
+  block('Race day execution',raceNotes(R));
+
+  // the detail sheet may already own the scroll lock; only take it if it does not
+  if(!$('#raceoverlay').classList.contains('open')){
+    if(!$('#overlay').classList.contains('open'))lockScroll();
+    $('#raceoverlay').classList.add('open');
+    sheet.scrollTop=0;
   }
-  sec.appendChild(el('h2',{text:'Race day execution',style:'margin-top:22px'}));
-  sec.appendChild(notes);
-  return sec;
+}
+function closeRaceDetails(){
+  $('#raceoverlay').classList.remove('open');
+  if(!$('#overlay').classList.contains('open'))unlockScroll();
 }
 function fmtPace(p){const m=Math.floor(p);const s=Math.round((p-m)*60);
   return s===60?`${m+1}:00`:`${m}:${String(s).padStart(2,'0')}`;}
@@ -1068,12 +1111,16 @@ $('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeDetai
 // charts are sized/labelled differently per breakpoint, so redraw on rotate/resize
 window.matchMedia('(max-width:599px)').addEventListener('change',()=>{if(DATA)updateTrends();});
 $('#rsoverlay').addEventListener('click',e=>{if(e.target.id==='rsoverlay')closeReschedule();});
+$('#raceoverlay').addEventListener('click',e=>{if(e.target.id==='raceoverlay')closeRaceDetails();});
 document.addEventListener('keydown',e=>{
   // the reschedule dialog sits above the detail sheet, so it closes first
   if(e.key==='Escape'){
-    if($('#rsoverlay').classList.contains('open'))closeReschedule();else closeDetail();
+    if($('#rsoverlay').classList.contains('open'))closeReschedule();
+    else if($('#raceoverlay').classList.contains('open'))closeRaceDetails();
+    else closeDetail();
     return;}
   if($('#rsoverlay').classList.contains('open'))return;   // don't page behind the dialog
+  if($('#raceoverlay').classList.contains('open'))return; // arrow keys page the schedule, not this
   if(!$('#overlay').classList.contains('open'))return;
   if(e.key==='ArrowLeft'&&schedIdx>0)openDetail(schedIdx-1);
   if(e.key==='ArrowRight'&&schedIdx<SCHED.length-1)openDetail(schedIdx+1);
