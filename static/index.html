@@ -117,6 +117,13 @@
     background:#004f46;color:#f0e7d8;font-weight:700;font-size:11px;
     text-transform:uppercase;letter-spacing:.06em;padding:8px 14px}
   .wkhead .wkdates{font-weight:600;letter-spacing:.02em;opacity:.75;text-transform:none}
+  /* past-weeks toggle: finished weeks fold away so the schedule opens on this week */
+  .pasttog{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
+    background:var(--surface-2);border:none;border-bottom:1px solid var(--grid);border-radius:0;
+    box-shadow:none;padding:11px 14px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;text-align:left}
+  .pasttog:hover,.pasttog:focus-visible{color:var(--text);outline:none}
+  .pasttog .ptmeta{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+  .pastwks[hidden]{display:none}
   .srow{padding:11px 14px;border-bottom:1px solid var(--grid);cursor:pointer}
   .srow:last-child{border-bottom:none}
   .srow:hover,.srow:focus-visible{background:var(--surface-2);outline:none}
@@ -322,6 +329,8 @@ function bindTip(node,html){
 
 // schedule rows (ordered) + current index, for prev/next navigation in the detail sheet
 let SCHED=[], schedIdx=0;
+// previous weeks in the schedule start folded; the choice sticks per browser
+let pastOpen=false; try{pastOpen=localStorage.getItem('rc.pastOpen')==='1';}catch(e){}
 // dashboard data + the trends time-window (default: latest 2 weeks, step by week)
 let DATA=null, winState={all:false, weeks:2, offset:0};
 
@@ -648,10 +657,32 @@ function render(d){
   // (identity on top, plan vs actual underneath) that wrap instead of overflow.
   SCHED=d.plan.slice().sort((a,b)=>a.date<b.date?-1:1);
   const list=el('div',{class:'sched'});
+  // Weeks that ended before this Monday fold into one block behind a toggle;
+  // the current week and everything ahead always stay open.
+  const now=new Date(), mon=new Date(now.getFullYear(),now.getMonth(),now.getDate()-((now.getDay()+6)%7));
+  const monISO=`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
+  const wkEnd={}; SCHED.forEach(w=>{if(!wkEnd[w.week]||w.date>wkEnd[w.week])wkEnd[w.week]=w.date;});
+  const isPast=w=>wkEnd[w.week]<monISO;
+  const pastWeeks=new Set(SCHED.filter(isPast).map(w=>w.week));
+  const past=el('div',{class:'pastwks'});
+  if(pastWeeks.size){
+    const done=SCHED.filter(w=>isPast(w)&&w.status==='done').length, tot=SCHED.filter(isPast).length;
+    const tog=el('button',{class:'pasttog','aria-controls':'pastwks'});
+    past.id='pastwks';
+    const paint=()=>{past.hidden=!pastOpen; tog.setAttribute('aria-expanded',String(pastOpen));
+      tog.replaceChildren(
+        el('span',{text:`${pastOpen?'▾ Hide':'▸ Show'} ${pastWeeks.size} previous weeks`}),
+        el('span',{class:'ptmeta',text:`${done}/${tot} done`}));};
+    tog.addEventListener('click',()=>{pastOpen=!pastOpen;
+      try{localStorage.setItem('rc.pastOpen',pastOpen?'1':'0');}catch(e){}
+      paint();});
+    paint(); list.appendChild(tog); list.appendChild(past);
+  }
   let curWk=null;
   SCHED.forEach((w,i)=>{
+    const into=isPast(w)?past:list;
     if(w.week!==curWk){curWk=w.week;
-      list.appendChild(el('div',{class:'wkhead'},[
+      into.appendChild(el('div',{class:'wkhead'},[
         el('span',{text:`Week ${w.week}`}),
         el('span',{class:'wkdates',text:fmtDate(w.date)})]));}
     const c=effortColor(w.type), a=w.actual;
@@ -678,7 +709,7 @@ function render(d){
         !a&&w.status==='missed'?stat('ran','not logged','miss'):null].filter(Boolean))]);
     row.addEventListener('click',()=>openDetail(i));
     row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(i);}});
-    list.appendChild(row);});
+    into.appendChild(row);});
   app.appendChild(el('section',{},[el('h2',{text:'Schedule'}),
     el('div',{class:'card schedcard'},list)]));
 }
