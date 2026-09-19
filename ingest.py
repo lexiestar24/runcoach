@@ -139,6 +139,20 @@ def sync_intraday(g, conn, dates):
     return total
 
 
+def upsert_vo2max(conn, date, metrics):
+    """Store the watch's VO2max for `date`, if Garmin recalculated it that day."""
+    for m in metrics or []:
+        gen = m.get("generic") or {}
+        if gen.get("vo2MaxValue") is None:
+            continue
+        conn.execute(
+            """INSERT INTO vo2max (date, value, precise) VALUES (?, ?, ?)
+               ON CONFLICT(date) DO UPDATE SET value=excluded.value,
+                 precise=excluded.precise, updated_at=datetime('now')""",
+            (gen.get("calendarDate") or date, _num(gen.get("vo2MaxValue")),
+             _num(gen.get("vo2MaxPreciseValue"))))
+
+
 def upsert_activity(conn, a):
     start = a.get("startTimeLocal")
     date = start.split(" ")[0] if start else None
@@ -216,6 +230,10 @@ def run(days=3, activities_count=30):
             upsert_sleep(conn, d, sl.get("dailySleepDTO") or {})
         except Exception as e:
             print(f"  sleep {d}: {e}", file=sys.stderr)
+        try:
+            upsert_vo2max(conn, d, g.get_max_metrics(d))
+        except Exception as e:
+            print(f"  vo2max {d}: {e}", file=sys.stderr)
         conn.commit()
         if days > 5:
             time.sleep(0.6)  # be gentle on backfill

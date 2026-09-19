@@ -47,6 +47,16 @@ CREATE TABLE IF NOT EXISTS intraday (
     PRIMARY KEY (date, minute)
 );
 
+-- Garmin's headline VO2max, as the watch shows it. Only written on days Garmin
+-- recalculates it. The per-activity vO2MaxValue lags this and can sit a whole
+-- point behind, so the dashboard reads from here.
+CREATE TABLE IF NOT EXISTS vo2max (
+    date            TEXT PRIMARY KEY,   -- YYYY-MM-DD the estimate was made
+    value           REAL,               -- rounded value shown on the watch
+    precise         REAL,               -- one decimal, e.g. 49.8
+    updated_at      TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS activities (
     activity_id     INTEGER PRIMARY KEY,
     start_local     TEXT,               -- 'YYYY-MM-DD HH:MM:SS'

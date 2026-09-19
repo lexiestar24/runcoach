@@ -131,6 +131,12 @@ def plan_with_actuals(conn):
     resched = {row["orig_date"]: row["new_date"]
                for row in conn.execute("SELECT orig_date, new_date FROM reschedules").fetchall()}
 
+    # the watch's own VO2max on the run's date; the per-run value lags it
+    try:
+        watch_vo2 = {r["date"]: r["value"] for r in conn.execute("SELECT date, value FROM vo2max")}
+    except Exception:
+        watch_vo2 = {}
+
     out = []
     for w in plan:
         match_date = resched.get(w["date"], w["date"])
@@ -155,7 +161,7 @@ def plan_with_actuals(conn):
                 if actual["avg_pace_s_per_km"] else None,
                 "avg_cadence": actual["avg_cadence"],
                 "elevation_gain": actual["elevation_gain"],
-                "vo2max": actual["vo2max"],
+                "vo2max": watch_vo2.get(actual["date"], actual["vo2max"]),
                 "type": actual["type"],
                 "notes": (actual["notes"] if "notes" in keys else None),
             }

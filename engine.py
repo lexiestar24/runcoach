@@ -571,9 +571,20 @@ def milestones(conn):
     runs = _rows(conn, "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= '" + TRAINING_START + "' ORDER BY start_local")
     total_mi = sum((r["distance_m"] or 0) for r in runs) / MILE_M
     longest = max(((r["distance_m"] or 0) / MILE_M for r in runs), default=0)
-    vo2 = [r["vo2max"] for r in runs if r["vo2max"]]
-    # trend over the recent training block, not all-time (avoids pre-training readings)
-    vo2_recent = vo2[-6:]
+    # Prefer the watch's own VO2max (the vo2max table); per-run values lag it.
+    # Trend = latest vs the reading ~6 weeks back, on the precise decimals.
+    watch = _rows(conn, "SELECT date, value, precise FROM vo2max WHERE date >= ? ORDER BY date",
+                  (TRAINING_START,))
+    if watch:
+        vo2 = [r["value"] for r in watch]
+        cutoff = (dt.date.fromisoformat(watch[-1]["date"]) - dt.timedelta(days=42)).isoformat()
+        base = next((r for r in watch if r["date"] >= cutoff), watch[0])
+        prec = lambda r: r["precise"] or r["value"]
+        vo2_recent = [prec(base), prec(watch[-1])]
+    else:
+        vo2 = [r["vo2max"] for r in runs if r["vo2max"]]
+        # trend over the recent training block, not all-time (avoids pre-training readings)
+        vo2_recent = vo2[-6:]
     today = dt.date.today()
     days_to_race = (RACE_DATE - today).days
     plan = planmod.load_plan()
