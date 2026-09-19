@@ -617,6 +617,20 @@ def _efficiency(a, heat_off):
     return round(speed_m_min / adj_hr, 3), round(adj_hr, 1)
 
 
+# Riegel's endurance exponent: at the same effort, pace slows by roughly
+# (distance ratio) ** 0.06. Raw efficiency therefore favours short runs, so a
+# 4 mile run could outrank a longer, better 8 mile one. Scaling by
+# miles ** 0.06 puts runs of different lengths on the same footing.
+RIEGEL_K = 0.06
+
+
+def _dist_efficiency(ei, miles):
+    """Efficiency credited for the distance it was held over."""
+    if not (ei and miles):
+        return None
+    return round(ei * miles ** RIEGEL_K, 3)
+
+
 def evaluation_context(conn):
     """Shared inputs for evaluate(): conditions, per-day readiness, cohorts."""
     try:
@@ -640,6 +654,7 @@ def evaluation_context(conn):
             "hr": a.get("avg_hr"),
             "adj_hr": adj_hr,
             "ei": ei,
+            "dei": _dist_efficiency(ei, a.get("distance_mi")),
             "indoor": bool(c.get("indoor")),
             "label": c.get("label"),
         })
@@ -744,14 +759,16 @@ def evaluate(w, conn=None, ctx=None):
 
     # --- 4. like-for-like: this run vs previous runs of the SAME type ---
     cohort = [r for r in (ctx or {}).get("cohorts", {}).get(ptype, []) if r["date"] < date]
-    peers = [r for r in cohort if r["ei"]]
+    # ranked on distance-credited efficiency, so length counts, not just speed/HR
+    dei = _dist_efficiency(ei, dist)
+    peers = [r for r in cohort if r["dei"]]
     comparison = None
-    if peers and ei:
-        eis = sorted(r["ei"] for r in peers)
+    if peers and dei:
+        eis = sorted(r["dei"] for r in peers)
         med_ei = statistics.median(eis)
-        better = sum(1 for v in eis if v < ei)
+        better = sum(1 for v in eis if v < dei)
         rank = len(eis) + 1 - better
-        pct = (ei - med_ei) / med_ei * 100
+        pct = (dei - med_ei) / med_ei * 100
         kind = {"shakeout": "shakeout", "long": "long run", "tempo": "tempo",
                 "interval": "interval session", "easy": "easy run",
                 "quality": "quality run", "race": "race"}.get(ptype, ptype)
@@ -760,7 +777,7 @@ def evaluate(w, conn=None, ctx=None):
 
         comparison = {
             "type": ptype, "n_peers": len(peers), "rank": rank,
-            "ei": ei, "median_ei": round(med_ei, 3), "pct_vs_median": round(pct, 1),
+            "ei": ei, "dist_ei": dei, "median_ei": round(med_ei, 3), "pct_vs_median": round(pct, 1),
             "median_pace": round(statistics.median(paces), 2) if paces else None,
             "median_adj_hr": round(statistics.median(hrs)) if hrs else None,
         }
@@ -770,7 +787,7 @@ def evaluate(w, conn=None, ctx=None):
         if pct >= 4:
             verdict += (f"this was {pct:.0f}% more efficient than your median "
                         f"({rank}{'st' if rank == 1 else 'nd' if rank == 2 else 'rd' if rank == 3 else 'th'} best). "
-                        "More distance per heartbeat, weather backed out. Real fitness showing.")
+                        "More distance per heartbeat, with weather backed out and run length credited. Real fitness showing.")
             if rating == "solid":
                 rating = "breakthrough" if rank == 1 else "strong"
         elif pct >= 1:
@@ -784,6 +801,10 @@ def evaluate(w, conn=None, ctx=None):
             if rating == "solid":
                 rating = "flat"
         points.append(verdict)
+
+        longest = max((r["miles"] or 0) for r in peers)
+        if dist and dist > longest + 0.1:
+            points.append(f"Longest {kind} yet: {dist} mi, up from {longest} mi.")
 
         if paces and a.get("avg_pace_min_per_mi"):
             mp = statistics.median(paces)

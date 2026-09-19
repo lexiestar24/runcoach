@@ -825,6 +825,7 @@ function openRaceDetails(){
   }
 }
 function closeRaceDetails(){
+  const s=$('#racesheet');s.classList.remove('snap');s.style.transform='';s.style.opacity='';
   $('#raceoverlay').classList.remove('open');
   if(!$('#overlay').classList.contains('open'))unlockScroll();
 }
@@ -1064,14 +1065,13 @@ function unlockScroll(){if(!document.body.classList.contains('locked'))return;
 function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.transform='';s.style.opacity='';
   $('#overlay').classList.remove('open');unlockScroll();}
 
-// ---- mobile swipe gestures on the detail sheet ----
-// Left/right pages through the schedule (mirrors the Prev/Next buttons and the
-// desktop arrow keys); a downward drag dismisses. Vertical dragging only takes
-// over when the sheet is already scrolled to the top, so normal content
-// scrolling still works, and the axis is locked on first movement so a scroll
-// never turns into an accidental navigation.
-(function(){
-  const sheet=$('#sheet');
+// ---- mobile swipe gestures on the bottom sheets ----
+// A downward drag dismisses. On the workout sheet, left/right also pages through
+// the schedule (mirrors the Prev/Next buttons and the desktop arrow keys).
+// Vertical dragging only takes over when the sheet is already scrolled to the
+// top, so normal content scrolling still works, and the axis is locked on first
+// movement so a scroll never turns into an accidental navigation.
+function sheetGestures(sheet,overlay,close,paging){
   const SWIPE_X=50, SWIPE_Y=90, SLOP=8;
   let sx=0,sy=0,dx=0,dy=0,axis=null,tracking=false,atTop=false;
 
@@ -1098,7 +1098,7 @@ function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.tr
       if(adx<SLOP&&ady<SLOP)return;
       // touch-action:pan-y guarantees a sideways drag is ours, so a simple
       // dominant-axis test is enough; downward drags only from the top
-      if(adx>ady)axis='x';
+      if(adx>ady){if(!paging){tracking=false;return;}axis='x';}
       else if(dy>0&&atTop)axis='y';
       else{tracking=false;return;}   // an ordinary vertical scroll: hands off
     }
@@ -1128,7 +1128,7 @@ function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.tr
     }else if(a==='y'&&my>SWIPE_Y){
       sheet.classList.add('snap');
       sheet.style.transform='translateY(110%)';sheet.style.opacity='0';
-      setTimeout(()=>{closeDetail();reset(false);},200);
+      setTimeout(()=>{close();reset(false);},200);
       tracking=false;return;
     }
     reset(true);
@@ -1136,8 +1136,10 @@ function closeDetail(){const s=$('#sheet');s.classList.remove('snap');s.style.tr
   sheet.addEventListener('touchend',finish,{passive:true});
   sheet.addEventListener('touchcancel',()=>reset(true),{passive:true});
   // the dimmed backdrop itself never scrolls anything
-  $('#overlay').addEventListener('touchmove',e=>{if(e.target.id==='overlay')e.preventDefault();},{passive:false});
-})();
+  overlay.addEventListener('touchmove',e=>{if(e.target===overlay)e.preventDefault();},{passive:false});
+}
+sheetGestures($('#sheet'),$('#overlay'),closeDetail,true);
+sheetGestures($('#racesheet'),$('#raceoverlay'),closeRaceDetails,false);
 $('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeDetail();});
 // charts are sized/labelled differently per breakpoint, so redraw on rotate/resize
 window.matchMedia('(max-width:599px)').addEventListener('change',()=>{if(DATA)updateTrends();});
