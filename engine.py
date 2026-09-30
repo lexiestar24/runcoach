@@ -1001,9 +1001,10 @@ def adjustments(conn):
     return out
 
 
-def series(conn, days=45):
-    """Time series for the dashboard charts."""
-    since = (dt.date.today() - dt.timedelta(days=days)).isoformat()
+def series(conn):
+    """Time series for the dashboard charts. Everything starts at plan week 1,
+    so the charts' "All" view really is all of training, not a rolling window."""
+    since = TRAINING_START
     daily = _rows(conn, "SELECT * FROM daily WHERE date >= ? ORDER BY date", (since,))
     sleep = _rows(conn, "SELECT * FROM sleep WHERE date >= ? ORDER BY date", (since,))
     sleep_by = {s["date"]: s for s in sleep}

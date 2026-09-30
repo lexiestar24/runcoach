@@ -360,6 +360,15 @@ function niceAxis(lo,hi,{zero=false,maxTicks=5}={}){
   return {min,max,ticks,fmt};
 }
 
+// Which points get a date under the x axis: start, middle and end on a normal
+// chart; on a wide scrolling one, about three per screenful so every view has dates.
+function dateIdx(n,w){
+  if(w<=680) return [...new Set([0,Math.floor(n/2),n-1])];
+  const step=Math.max(1,Math.round(n/(w/680*3))), out=[];
+  for(let i=0;i<n;i+=step) out.push(i);
+  if(n-1-out[out.length-1]<step/2) out.pop();  // don't crowd the newest label
+  out.push(n-1); return out;
+}
 function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],baseline=null,unit='',
     ptColor=null,tipHtml=null,line=true,refs=[]}){
   const mob=MOBILE(), fs=FS();
@@ -398,7 +407,7 @@ function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],basel
       if(b.label)tag(pad.l+6,y1+13,b.color,mob?(b.short||b.label):b.label);}});
   ax.ticks.forEach(v=>{const y=Y(v);
     s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
-    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},ax.fmt(v)));});
+    s.appendChild(el('text',{class:'yax',x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},ax.fmt(v)));});
   if(baseline!=null){const y=Y(baseline);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
     if(!mob)marginLabel(y,'--muted',`baseline ${fmt(baseline)}`,false);}
   refs.forEach(r=>{const y=Y(r.y);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv(r.color||'--muted'),'stroke-width':1.5,'stroke-dasharray':'2 3'}));
@@ -413,7 +422,7 @@ function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],basel
     s.appendChild(c);});
   // Anchor the end labels inward: centred text at the plot edge overflows the
   // padding and gets clipped by the viewBox (the newest date lost its tail).
-  [...new Set([0,Math.floor(pts.length/2),pts.length-1])].forEach(i=>{if(pts[i])
+  dateIdx(pts.length,w).forEach(i=>{if(pts[i])
     s.appendChild(el('text',{x:X(i),y:h-8,
       'text-anchor':i===0?'start':i===pts.length-1?'end':'middle',
       fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
@@ -437,7 +446,7 @@ function groupedBars(data,{w=680,h=240}){
   const s=svgEl(w,h);
   ax.ticks.forEach(v=>{const y=Y(v);
     s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
-    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},ax.fmt(v)));});
+    s.appendChild(el('text',{class:'yax',x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},ax.fmt(v)));});
   data.forEach((d,i)=>{const x0=pad.l+bw*i+(bw-inner)/2;
     const mk=(val,off,color,cls)=>{const y=Y(val),bh=pad.t+ih-y;
       const r=el('rect',{x:x0+off,y,width:each-2,height:Math.max(0,bh),rx:3,fill:cssv(color)});
@@ -460,13 +469,13 @@ function barChart(data,{yKey,w=680,h=200,color='--blue',target=null,unit='',tipH
   const s=svgEl(w,h);
   ax.ticks.forEach(v=>{const y=Y(v);
     s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
-    s.appendChild(el('text',{x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},ax.fmt(v)));});
+    s.appendChild(el('text',{class:'yax',x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},ax.fmt(v)));});
   pts.forEach((d,i)=>{const y=Y(d[yKey]),x=pad.l+bw*i+bw*0.15;
     const r=el('rect',{x,y,width:bw*0.7,height:Math.max(0,pad.t+ih-y),rx:3,fill:cssv(color)});
     s.appendChild(r);});
   if(target!=null){const y=Y(target);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
     if(!mob)s.appendChild(el('text',{x:pad.l+iw+6,y:y+3,'text-anchor':'start',fill:cssv('--muted'),'font-size':fs.ref},tlab));}
-  [...new Set([0,Math.floor(pts.length/2),pts.length-1])].forEach(i=>{if(pts[i])
+  dateIdx(pts.length,w).forEach(i=>{if(pts[i])
     s.appendChild(el('text',{x:Math.min(Math.max(pad.l+bw*i+bw/2,pad.l),pad.l+iw),y:h-8,
       'text-anchor':i===0?'start':i===pts.length-1?'end':'middle',
       fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
@@ -517,6 +526,25 @@ function trendWindow(){
   return {start,end,atOldest:start<=minD,atNewest:winState.offset<=0};
 }
 const inWin=(arr,w)=>arr.filter(x=>x.date>=w.start&&x.date<=w.end);
+// "All" on a phone: squeezing months of points into one screen turns the (fat,
+// tappable) mobile dots into a smear. Give each point room instead, keep the
+// same on-screen scale as the 2-week view, and let the chart pan sideways.
+const chartW=n=>winState.all&&MOBILE()?Math.max(680,n*20):680;
+function scrollBox(svg){
+  const box=el('div',{class:'scroll'},svg), w=+svg.getAttribute('width');
+  if(w<=680) return box;
+  svg.style.maxWidth='none';svg.style.width=`${w/680*100}%`;
+  requestAnimationFrame(()=>{box.scrollLeft=box.scrollWidth;});  // open on the newest days
+  // Pin a copy of the y-axis numbers over the left edge so the scale stays in
+  // view while the plot pans. Same viewBox height + scale, so they line up.
+  const ys=[...svg.querySelectorAll('.yax')]; if(!ys.length) return box;
+  const h=+svg.getAttribute('height'), pl=Math.max(...ys.map(t=>+t.getAttribute('x')))+2;  // stop short of the first dot
+  const pin=el('svg',{viewBox:`0 0 ${pl} ${h}`,width:pl,height:h,'aria-hidden':'true'});
+  pin.style.cssText=`position:absolute;left:0;top:0;width:${pl/680*100}%;pointer-events:none`;
+  pin.appendChild(el('rect',{x:0,y:0,width:pl,height:h,fill:cssv('--surface')}));
+  ys.forEach(t=>pin.appendChild(t.cloneNode(true)));
+  return el('div',{style:'position:relative'},[box,pin]);
+}
 
 function updateTrends(){
   const ctl=$('#winctl'), grid=$('#chartgrid'); if(!ctl||!grid)return;
@@ -556,7 +584,7 @@ function updateTrends(){
   grid.appendChild(card('Resting heart rate','Lower & stable = recovered. Dashed line is your baseline.',
     hasV(rec,'resting_hr')
       ? el('div',{},[
-          el('div',{class:'scroll'},lineChart(rec,{yKey:'resting_hr',color:'#ae5225',baseline:M_baseline(DATA),unit:' bpm',
+          scrollBox(lineChart(rec,{w:chartW(rec.length),yKey:'resting_hr',color:'#ae5225',baseline:M_baseline(DATA),unit:' bpm',
             tipHtml:d=>`<b>${fmtDate(d.date)} · resting HR</b>${d.resting_hr} bpm${d.sleep_score?` · sleep ${d.sleep_score}`:''}`})),
           // the in-plot baseline caption is dropped on mobile, so keep its value here
           legend([{color:'#ae5225',label:'resting HR'},
@@ -565,7 +593,7 @@ function updateTrends(){
 
   grid.appendChild(card('Sleep duration','Nightly hours. Dashed line = 7.5h feel-good target.',
     hasV(rec,'sleep_hours')
-      ? el('div',{class:'scroll'},barChart(rec,{yKey:'sleep_hours',color:'--green',target:7.5,unit:'h',
+      ? scrollBox(barChart(rec,{w:chartW(rec.length),yKey:'sleep_hours',color:'--green',target:7.5,unit:'h',
           tipHtml:d=>`<b>${fmtDate(d.date)} · sleep</b>${d.sleep_hours} h${d.sleep_score?` · score ${d.sleep_score}`:''}`}))
       : empty('No sleep data in this range.')));
 
@@ -575,7 +603,7 @@ function updateTrends(){
       : `Each dot is a run, colored by intended effort. Green band is your easy range (~${eb.lo}-${eb.hi} bpm, median ${eb.median}); upper band is tempo.`,
     hasV(runs,'avg_hr')
       ? el('div',{},[
-          el('div',{class:'scroll'},lineChart(runs,{yKey:'avg_hr',unit:' bpm',
+          scrollBox(lineChart(runs,{w:chartW(runs.length),yKey:'avg_hr',unit:' bpm',
             ptColor:r=>r.intent==='hard'?'--red':'--blue',
             tipHtml:r=>`<b style="color:${cssv(r.intent==='hard'?'--red':'--blue')}">${fmtDate(r.date)} · ${r.planned_type||'run'}</b>${r.miles} mi · avg ${r.avg_hr} bpm · max ${r.max_hr||'–'} bpm`,
             bands:[{lo:eb.lo,hi:eb.hi,color:'--green',label:`Easy · talk test (~${eb.lo}-${eb.hi})`,short:`${eb.lo}-${eb.hi}`},
