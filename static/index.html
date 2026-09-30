@@ -831,6 +831,9 @@ function closeRaceDetails(){
 }
 function fmtPace(p){const m=Math.floor(p);const s=Math.round((p-m)*60);
   return s===60?`${m+1}:00`:`${m}:${String(s).padStart(2,'0')}`;}
+// seconds -> h:mm:ss (or m:ss under an hour), the way Garmin shows run time
+function fmtDuration(sec){const t=Math.round(sec);const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=t%60;
+  const ss=String(s).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${ss}`:`${m}:${ss}`;}
 const scoreColor=s=>s>=72?'--good':s>=55?'--warning':'--critical';
 
 // The readiness score is only true for one moment, so name it. If the watch has
@@ -1010,7 +1013,7 @@ function openDetail(i){
 
   if(w.actual){
     const a=w.actual;
-    const stats=[['Distance',`${a.distance_mi} mi`],['Time',`${a.duration_min} min`],
+    const stats=[['Distance',`${a.distance_mi} mi`],['Total time',a.duration_s?fmtDuration(a.duration_s):`${a.duration_min} min`],
         ['Avg HR',`${a.avg_hr||'–'} bpm`],['Max HR',`${a.max_hr||'–'} bpm`],
         ['Pace',a.avg_pace_min_per_mi?`${a.avg_pace_min_per_mi} /mi`:'–']];
     if(a.avg_cadence) stats.push(['Cadence',`${Math.round(a.avg_cadence)} spm`]);
