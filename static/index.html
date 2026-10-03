@@ -74,6 +74,15 @@
   .reasons{list-style:none;padding:0;margin:0;display:grid;gap:6px}
   .reasons li{font-size:13px;color:var(--text-2);padding-left:18px;position:relative;line-height:1.4}
   .reasons li::before{content:"";position:absolute;left:2px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--blue)}
+  /* how to run today's session when readiness is below green */
+  .guide{background:var(--page);border:1px solid var(--border);border-left:3px solid var(--warning);border-radius:11px;padding:12px 14px;margin:0 0 14px}
+  .guide h3{margin:0 0 6px;font-size:15px;font-weight:650}
+  .guide p{margin:0 0 8px;font-size:14px;line-height:1.45;color:var(--text)}
+  .guide ol{margin:0 0 8px;padding-left:20px;display:grid;gap:5px}
+  .guide li{font-size:13px;line-height:1.45;color:var(--text-2)}
+  .guide .bt{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px}
+  .guide ul{margin:0;padding-left:18px;display:grid;gap:3px}
+  .guide ul li{font-size:13px}
   /* progress */
   .bar{height:12px;border-radius:6px;background:var(--grid);overflow:hidden;margin:10px 0 6px}
   .bar > i{display:block;height:100%;border-radius:6px;background:var(--blue)}
@@ -632,6 +641,7 @@ function render(d){
   const body=[el('div',{class:'label',text:R.label}),el('div',{class:'asof',text:asofLine(R)}),
     el('div',{class:'verdict',text:R.verdict})];
   dayline(R,d.outlook||{}).forEach(n=>body.push(n));
+  const G=(d.outlook||{}).guidance; if(G)body.push(guideCard(G));
   body.push(el('ul',{class:'reasons'},R.reasons.map(x=>el('li',{text:x}))));
   app.appendChild(el('section',{},[
     el('div',{class:'card hero'},[el('div',{class:'ring'},ring(R.score,rc)),el('div',{class:'body'},body)])
@@ -897,6 +907,18 @@ function dayline(R,O){
       `through the afternoon, so treat it as an estimate that firms up as the day gets logged.`}));
   }
   return out;
+}
+
+// "Back off" alone leaves the real question open when a run is on the schedule.
+// This spells out how to run it: the intro, steps, and when to ease off.
+function guideCard(G){
+  const kids=[el('h3',{text:G.title}),el('p',{text:G.intro})];
+  if(G.steps&&G.steps.length)kids.push(el('ol',{},G.steps.map(x=>el('li',{text:x}))));
+  if(G.bail&&G.bail.length){
+    kids.push(el('div',{class:'bt',text:'Ease off or cut it short if'}));
+    kids.push(el('ul',{},G.bail.map(x=>el('li',{text:x}))));
+  }
+  return el('div',{class:'guide'},kids);
 }
 
 function M_baseline(d){return d.readiness.baseline_rhr;}

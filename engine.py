@@ -304,7 +304,32 @@ def readiness(conn, asof=None, at=None):
         delta = today_rhr - base_rhr
         parts["rhr"] = 1.0 - _ramp(delta, -1.0, 8.0)    # at baseline => ~0.9, +8 => 0
         if delta >= 5:
-            reasons.append(f"Resting HR {today_rhr} is {delta:.0f} bpm over your baseline ({base_rhr:.0f}) -- a classic not-recovered flag.")
+            # How long has it been up? A multi-day plateau reads as accumulated life
+            # load; a one-day jump with no hard session behind it is the pattern that
+            # most deserves an illness check.
+            streak = 0
+            for v in reversed(rhr_series):
+                if v - base_rhr >= 3:
+                    streak += 1
+                else:
+                    break
+            d0 = dt.date.fromisoformat(asof)
+            hard_recent = _rows(conn,
+                "SELECT date, distance_m, avg_hr FROM activities WHERE type LIKE '%running%' "
+                "AND date >= ? AND date < ? AND (avg_hr >= 168 OR distance_m >= ?)",
+                ((d0 - dt.timedelta(days=2)).isoformat(), asof, 8 * MILE_M))
+            why = []
+            if streak >= 3:
+                why.append(f"it has been up {streak} days running, which looks like accumulated load "
+                           "(travel, stress, a busy week) more than one bad night")
+            if hard_recent:
+                day = dt.date.fromisoformat(hard_recent[-1]["date"]).strftime("%A")
+                why.append(f"{day}'s hard run is still part of it")
+            if streak <= 1 and not hard_recent:
+                why.append("it jumped overnight with no hard session behind it, so check yourself "
+                           "for illness symptoms before training")
+            reasons.append(f"Resting HR {today_rhr} is {delta:.0f} bpm over your baseline ({base_rhr:.0f})"
+                           + (f"; {'; '.join(why)}." if why else " -- a classic not-recovered flag."))
             flags.append("elevated RHR")
         elif delta >= 2:
             reasons.append(f"Resting HR {today_rhr} is mildly up ({delta:+.0f} vs {base_rhr:.0f}).")
@@ -415,9 +440,29 @@ def readiness(conn, asof=None, at=None):
                      "Other signals look fine, but that is capped by how little you actually slept -- "
                      "the rest of the body hasn't caught up with it yet."))
     if parts.get("rhr") is not None and parts["rhr"] < 0.45:
-        caps.append((round(45 + 70 * parts["rhr"]),
-                     "That is capped by a resting heart rate this far over baseline, which is the "
-                     "clearest signal there is that recovery is unfinished."))
+        # Resting HR alone is a noisy witness for her. Every big RHR spike on record
+        # (June and Sep 2026 stress stretches, the post-travel week in Oct) tracked
+        # life load -- travel, worry, responsibility -- with sleep, Body Battery and
+        # stress all fine, and training through them never made things worse. So a
+        # lone RHR spike only holds the day in the "Moderate" band; it caps hard
+        # when a second signal agrees that the body is genuinely short.
+        hard_cap = round(45 + 70 * parts["rhr"])
+        corroborating = [k for k in ("sleep", "debt", "battery", "stress")
+                         if parts.get(k) is not None and parts[k] < 0.5]
+        if corroborating:
+            names = {"sleep": "last night's sleep", "debt": "sleep debt",
+                     "battery": "Body Battery", "stress": "stress"}
+            caps.append((hard_cap,
+                         "That is capped by a resting heart rate this far over baseline, and "
+                         + " and ".join(names[k] for k in corroborating)
+                         + " agree" + ("s" if len(corroborating) == 1 else "")
+                         + ": more than one signal says recovery is unfinished."))
+        else:
+            caps.append((max(hard_cap, 62),
+                         "Resting HR is the only signal that is off. Sleep, Body Battery and stress "
+                         "all look normal, which for you has usually meant life load (travel, worry, "
+                         "a hard session) rather than a body that can't train. So the day is held to "
+                         "Moderate, not marked down further: run it by effort, not by pace."))
     # A day already spent cannot read as a fresh one. Being above your own curve
     # for 5pm is genuinely good news, but it is still 5pm: five-sixths of the
     # day's Body Battery is gone and the morning's numbers cannot buy it back.
@@ -498,6 +543,101 @@ def usual_run_minute(conn, date):
     return None
 
 
+def _miles(x):
+    """Round to a half mile, written without a trailing .0."""
+    v = max(1.0, round(x * 2) / 2)
+    return f"{v:g}"
+
+
+def session_guidance(r, workout):
+    """Turn a below-green readiness into a concrete plan for today's session.
+
+    "Back off" on its own leaves the real question open: I have a 9 miler on the
+    schedule, so what do I actually do? This answers it per workout type, in her
+    own HR zones, with a checkpoint and a cut-down distance chosen in advance so
+    the decision is not being made from inside a tired head at mile 6.
+    """
+    label = r["label"]
+    if not workout or label in ("Primed", "Ready"):
+        return None
+    wtype = workout.get("type") or "easy"
+    mi = workout.get("miles") or 0
+    flags = set(r.get("flags") or [])
+    rhr_up = "elevated RHR" in flags
+    title = f"How to run today's {mi:g} mi {planmod._TYPE_LABEL.get(wtype, wtype)}"
+
+    steps, bail = [], []
+    if rhr_up:
+        steps.append("Your HR will sit a few beats higher than usual at any pace today. Go by "
+                     "the talk test and treat the numbers as a ceiling, not a target.")
+
+    if wtype == "race":
+        intro = ("It's race day, so you're running. Use this to set expectations: start "
+                 "conservatively and stick to your pacing plan.")
+        steps += ["Run miles 1-4 at the bottom of the planned HR band, even if it feels too easy.",
+                  "Walk every aid station as planned."]
+    elif label == "Rest":
+        title = f"Today's {mi:g} mi {planmod._TYPE_LABEL.get(wtype, wtype)}: recover instead"
+        intro = ("Today is better spent recovering. Take a walk, do some easy mobility, or rest "
+                 "completely. One skipped session costs nothing in fitness.")
+        if wtype == "long":
+            steps.append(f"Move the long run to tomorrow if you feel better, or repeat {mi:g} mi "
+                         "next week instead of stepping up.")
+        elif wtype in ("tempo", "interval"):
+            steps.append("Don't move the quality session onto another day this week. Just skip it.")
+        else:
+            steps.append("If you really want to move, walk or jog 15-20 min with no watch targets.")
+    elif wtype == "long":
+        cut = _miles(mi * (0.75 if label == "Moderate" else 0.7))
+        check = _miles(mi * 0.45)
+        intro = (f"Run it, but make it a truly easy, flexible long run. Decide at mile {check} "
+                 f"whether it is {mi:g} mi or {cut} mi.")
+        steps += [
+            "Start slower than feels necessary. The first 2 miles set up the whole run.",
+            "Aim for HR 152-158 (your long-run zone) and full sentences. Take walk breaks "
+            "whenever HR creeps past ~160. Walk breaks are part of the plan.",
+            f"Pick a route you can cut short (a loop near home, or a turnaround you can move).",
+            f"At mile {check}: if talking is easy and your legs feel normal, go for {mi:g}. "
+            f"If not, finish at {cut} mi. That still counts as a good long run.",
+            "Fuel like normal: gels around miles 3-4 and 6-7, and water. Ignore pace entirely.",
+        ]
+        bail += [f"HR stays above ~162 even with walk breaks", "you feel heavy or are forcing it",
+                 "a headache or nausea starts"]
+        steps.append(f"If you cut it short, repeat {mi:g} mi next week instead of stepping up.")
+    elif wtype in ("tempo", "interval"):
+        if label == "Moderate":
+            block = "about two-thirds of the planned tempo"
+            intro = (f"Keep the session but shorten the hard part to {block}, and cap HR at 175.")
+            steps += [
+                "Warm up with at least 0.5-1 mi of easy running. Use it as a check-in.",
+                "Run the tempo by effort: HR 170-175, a few words at a time. Don't chase "
+                "your benchmark pace.",
+                "Check in at the end of the shortened block. Add the rest only if the effort "
+                "still feels like a normal tempo.",
+                "Make the cooldown genuinely easy, walking if you need to.",
+            ]
+        else:
+            intro = ("Swap the tempo for an easy run with a few strides. Move the quality to "
+                     "later in the week only if readiness comes back up and it isn't the day "
+                     "before a long run.")
+            steps += [
+                f"Run {_miles(min(mi, 3))} mi easy at HR 155-162 with full sentences.",
+                "Optional: 4 relaxed 20-second strides near the end, full recovery between.",
+            ]
+        bail += ["HR spikes well above normal for the effort", "a headache or nausea starts"]
+    else:  # easy, shakeout, quality (easy + strides)
+        intro = ("Easy days are already the right kind of training for this. Keep it short "
+                 "and truly easy, or skip it guilt-free.")
+        steps += [f"Run up to {_miles(mi)} mi at HR 155-162, full sentences the whole way.",
+                  "Drop any strides today."]
+        bail += ["it feels like work instead of a loosen-up"]
+
+    if rhr_up and wtype != "race":
+        bail.append("you have any illness signs (sore throat, congestion, aches, chills, fever, "
+                    "chest tightness): stop and rest")
+    return {"title": title, "label": label, "intro": intro, "steps": steps, "bail": bail}
+
+
 def day_outlook(conn):
     """How readiness moves across today: at wake, right now, and at run time.
 
@@ -538,6 +678,9 @@ def day_outlook(conn):
     out["workout"] = {"summary": due["summary"], "type": due["type"],
                       "miles": due["planned_miles"], "status": due.get("status"),
                       "at_label": _hhmm(run_min) if run_min is not None else None}
+    # Guide the session off the score she'll actually run on, or the score right now.
+    basis = r if out.get("at_run") else readiness(conn, asof=iso)
+    out["guidance"] = session_guidance(basis, out["workout"])
     return out
 
 
@@ -951,8 +1094,17 @@ def adjustments(conn):
         if r["score"] < 55:
             when = (f"By {r['at_label']}, when you usually run, readiness projects to {r['score']}"
                     if r is at_run and r is not ready else f"Readiness is low ({r['score']})")
+            what = ("Run it as an easy, flexible long run with a planned cut-down point"
+                    if w["type"] == "long" else
+                    "Consider swapping it for an easy run or rest, and moving the quality session later in the week")
+            more = " (see How to run it in the readiness card)" if w["date"] == today.isoformat() else ""
             out.append({"severity": "high", "date": w["date"],
-                "text": f"{when} and {w['date']} is a {w['type']} day ({w['planned_miles']} mi). Consider swapping it for an easy run or rest, and moving the quality session later in the week."})
+                "text": f"{when} and {w['date']} is a {w['type']} day ({w['planned_miles']} mi). {what}{more}."})
+        elif r["score"] < 72 and w["date"] == today.isoformat():
+            # Moderate on a hard day: still on, but not "as written" -- point at the plan.
+            out.append({"severity": "med", "date": w["date"],
+                "text": f"Readiness is {r['label']} ({r['score']}) on a {w['type']} day ({w['planned_miles']} mi). "
+                        "Keep the session, but run it by effort. See How to run it in the readiness card."})
         break
 
     # 2) Scheduling conflicts (blocked dates)
