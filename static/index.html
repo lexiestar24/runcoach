@@ -765,8 +765,8 @@ function raceNums(R,P){
   const n=(k,v,d)=>el('div',{class:'rc-n'},[
     el('div',{class:'k',text:k}),el('div',{class:'v',html:v}),el('div',{class:'d',text:d||''})]);
   return [
-    n('Goal race pace (est.)', P.available?`${P.central_pace_str}<small>/mi</small>`:'--',
-      P.available?`range ${P.band_str}`:'no long runs logged yet'),
+    n('Avg race pace (est.)', P.available?`${P.central_pace_str}<small>/mi</small>`:'--',
+      P.available?`range ${P.band_str}, walks incl.`:'no long runs logged yet'),
     n('Projected finish', P.available?P.finish_central:'--', P.available?`range ${P.finish_band}`:''),
     n('Race day', `${R.days_out}<small>days</small>`, `gun ${R.gun_time}`)];
 }
@@ -776,13 +776,31 @@ function raceCredits(P){
     el('span',{class:'est',text:P.measured?'MEASURED · ':'ESTIMATE · '}),
     el('span',{text:P.basis})]);
   const det=el('details',{class:'credits'},[
-    el('summary',{text:`How ${P.central_pace_str} is built: ${P.baseline_pace_str}/mi ${P.baseline_label||'long-run pace'}, minus ${P.total_credit_sec} sec/mi`})]);
+    el('summary',{text:`How ${P.central_pace_str} is built: ${P.baseline_pace_str}/mi ${P.baseline_label||'long-run pace'} to ${P.effort_pace_str||P.central_pace_str}/mi race effort, then the race plan`})]);
   (P.credits||[]).forEach(c=>det.appendChild(el('div',{class:'credrow'},[
     el('div',{class:'cl'},[el('span',{text:c.label}),el('i',{text:c.why})]),
     el('div',{class:'cv',text:c.sec_per_mi<0?`+${-c.sec_per_mi}s`:`-${c.sec_per_mi}s`})])));
   det.appendChild(el('div',{class:'credrow tot'},[
-    el('div',{class:'cl',text:`Total credit vs your ${P.baseline_label||'long-run pace'}`}),
+    el('div',{class:'cl',text:`Total credit vs your ${P.baseline_label||'long-run pace'}, giving race effort pace`}),
     el('div',{class:'cv',text:`-${P.total_credit_sec}s`})]));
+  const rp=P.race_plan;
+  if(rp){
+    det.appendChild(el('div',{class:'credrow tot'},[
+      el('div',{class:'cl',text:`Race effort pace (HR 164)`}),
+      el('div',{class:'cv',text:`${P.effort_pace_str}`})]));
+    rp.phases.forEach(p=>det.appendChild(el('div',{class:'credrow'},[
+      el('div',{class:'cl'},[el('span',{text:`Mi ${p.miles} at HR ${p.hr}`}),el('i',{text:`${Math.round(p.minutes)} min`})]),
+      el('div',{class:'cv',text:p.pace_str})])));
+    det.appendChild(el('div',{class:'credrow'},[
+      el('div',{class:'cl'},[el('span',{text:`${rp.walk_stops} aid-station walk breaks`}),el('i',{text:'30-45 sec each; walking still covers ground, so only the difference counts'})]),
+      el('div',{class:'cv',text:`+${rp.walk_cost_s}s`})]));
+    det.appendChild(el('div',{class:'credrow'},[
+      el('div',{class:'cl'},[el('span',{text:`${rp.course_mi} mi actually covered`}),el('i',{text:'weaving and corners; the clock times what you run, not 13.1'})]),
+      el('div',{class:'cv',text:'incl.'})]));
+    det.appendChild(el('div',{class:'credrow tot'},[
+      el('div',{class:'cl',text:`Finish ${P.finish_central}, which is ${P.central_pace_str}/mi over 13.1`}),
+      el('div',{class:'cv',text:P.finish_central})]));
+  }
   det.appendChild(el('div',{class:'rbasis',text:
     `1 bpm is worth ~${P.sec_per_bpm} sec/mi for you (${P.slope_fitted?`fitted from ${P.slope_n} of your own runs`:'default, not enough data to fit yours yet'}). `+
     `Credits are deliberately conservative: the failure mode that ruins a first half is a projection that is too fast, believed at mile 2.`}));

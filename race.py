@@ -40,6 +40,27 @@ SLOPE_BOUNDS = (1.5, 4.0)
 
 COOL_OPTIMUM_F = 50.0
 
+# The race is run in phases, not at one pace: easy start, settle, work, empty it.
+# (label, miles, HR band, HR the phase is run at). Each phase's pace is the race-
+# effort pace moved by (RACE_HR_MID - phase HR) x her own sec-per-bpm slope.
+PHASES = [
+    ("1-4", 4.0, "155-162", 158.5),
+    ("5-9", 5.0, "158-165", 161.5),
+    ("10-12", 3.0, "163-170", 166.5),
+    ("13", 1.1, "whatever is left", 172.0),
+]
+
+# Planned walk breaks at aid stations, roughly every 1.75 mi through mile 12
+# (none in the last mile). Walking still covers ground, so the cost is only the
+# time beyond what running that stretch would have taken.
+WALK_EVERY_MI = 1.75
+WALK_S = 37.5                 # 30-45 sec
+WALK_PACE_MIN = 18.0          # brisk walk, min/mi
+
+# Nobody runs the measured line: weaving and wide corners put ~0.8% on the
+# distance actually covered, and the clock times that distance.
+COURSE_EXTRA = 0.008
+
 
 def _pace_min_per_mi(row):
     if not row["distance_m"] or not row["duration_s"]:
@@ -327,7 +348,9 @@ def projection(conn, plan_workouts=None, today=None):
         basis = (f"Modelled from {len(longs)} recent long runs (median {_fmt_pace(base)}/mi "
                  f"at HR {base_hr:.0f}, {base_temp:.0f}F). No goal-race-pace session logged yet.")
 
-    lo, hi = central - 20 / 60.0, central + 20 / 60.0
+    plan = race_plan(central, sec_per_bpm)
+    lo_plan = race_plan(central - 20 / 60.0, sec_per_bpm)
+    hi_plan = race_plan(central + 20 / 60.0, sec_per_bpm)
     return {
         "available": True,
         "basis": basis,
@@ -343,32 +366,72 @@ def projection(conn, plan_workouts=None, today=None):
         "weeks_out": round(weeks_out, 1),
         "credits": [{"label": l, "sec_per_mi": round(v), "why": w} for l, v, w in credits],
         "total_credit_sec": round(total),
-        "central_pace": round(central, 2),
-        "central_pace_str": _fmt_pace(central),
-        "band_str": f"{_fmt_pace(lo)}-{_fmt_pace(hi)}",
-        "finish_central": _fmt_time(central * RACE_DISTANCE_MI),
-        "finish_band": f"{_fmt_time(lo * RACE_DISTANCE_MI)}-{_fmt_time(hi * RACE_DISTANCE_MI)}",
-        "ceiling_first_4mi": _fmt_pace(central + 40 / 60.0),
+        # race-effort running pace (HR 164), before phases and walk breaks
+        "effort_pace": round(central, 2),
+        "effort_pace_str": _fmt_pace(central),
+        # what the official result will say: finish / 13.1, walks included
+        "central_pace": round(plan["avg_pace"], 2),
+        "central_pace_str": _fmt_pace(plan["avg_pace"]),
+        "band_str": f"{_fmt_pace(lo_plan['avg_pace'])}-{_fmt_pace(hi_plan['avg_pace'])}",
+        "finish_central": _fmt_time(plan["finish_min"]),
+        "finish_band": f"{_fmt_time(lo_plan['finish_min'])}-{_fmt_time(hi_plan['finish_min'])}",
+        "ceiling_first_4mi": _fmt_pace(plan["ceiling_first_4mi"]),
+        "race_plan": plan,
         "grp_sessions": grp,
+    }
+
+
+def race_plan(effort_pace, sec_per_bpm):
+    """Finish time built phase by phase, with walk breaks and real distance covered.
+
+    `effort_pace` is the running pace at race effort (HR 164). The first miles
+    run below it and the last ones above it; the planned walks and the extra
+    distance nobody avoids are added on top. Returns per-phase paces too.
+    """
+    k = COURSE_EXTRA + 1.0
+    phases_out, run_min, mile_at = [], 0.0, 0.0
+    for label, miles, band, hr in PHASES:
+        pace = effort_pace + (RACE_HR_MID - hr) * sec_per_bpm / 60.0
+        run_min += pace * miles * k
+        phases_out.append({"miles": label, "hr": band, "pace": round(pace, 2),
+                           "pace_str": _fmt_pace(pace), "minutes": round(pace * miles * k, 1)})
+        mile_at += miles
+    stops = int(12.0 // WALK_EVERY_MI)
+    run_pace = effort_pace
+    walk_cost_s = stops * (WALK_S - (WALK_S / (WALK_PACE_MIN * 60.0)) * run_pace * 60.0)
+    finish = run_min + walk_cost_s / 60.0
+    # Top of the opening HR band (162) marks the fastest the first 4 miles should go.
+    ceiling = effort_pace + (RACE_HR_MID - 162) * sec_per_bpm / 60.0
+    return {
+        "phases": phases_out,
+        "walk_stops": stops,
+        "walk_cost_s": round(walk_cost_s),
+        "course_mi": round(RACE_DISTANCE_MI * k, 2),
+        "finish_min": round(finish, 1),
+        "avg_pace": finish / RACE_DISTANCE_MI,
+        "ceiling_first_4mi": ceiling,
     }
 
 
 def phases(proj):
     """The four-phase race plan. Pace is a CEILING early, an outcome late."""
-    c = proj.get("central_pace") if proj.get("available") else None
-    def ceil(extra):
-        return f"no faster than {_fmt_pace(c + extra / 60.0)}/mi" if c else "hold back"
+    rp = (proj.get("race_plan") or {}) if proj.get("available") else {}
+    ps = {p["miles"]: p for p in rp.get("phases", [])}
+    def at(lab, fmt, fallback):
+        return fmt.format(ps[lab]["pace_str"]) if lab in ps else fallback
+    ceiling = _fmt_pace(rp["ceiling_first_4mi"]) if rp else None
     return [
-        {"miles": "1-4", "hr": "155-162", "pace": ceil(40),
+        {"miles": "1-4", "hr": "155-162",
+         "pace": f"~{ps['1-4']['pace_str']}/mi, never faster than {ceiling}/mi" if rp else "hold back",
          "job": "Sit on your hands. Should feel almost too easy.",
          "talk": "Full sentences"},
-        {"miles": "5-9", "hr": "158-165", "pace": f"settle to ~{_fmt_pace(c)}/mi" if c else "settle",
+        {"miles": "5-9", "hr": "158-165", "pace": at("5-9", "settle to ~{}/mi", "settle"),
          "job": "Settle in. Let the pace come to you.",
          "talk": "Short sentences"},
-        {"miles": "10-12", "hr": "163-170", "pace": "whatever the effort gives",
+        {"miles": "10-12", "hr": "163-170", "pace": at("10-12", "~{}/mi, whatever the effort gives", "whatever the effort gives"),
          "job": "Now you are allowed to work.",
          "talk": "A few words"},
-        {"miles": "13", "hr": "whatever is left", "pace": "empty it",
+        {"miles": "13", "hr": "whatever is left", "pace": at("13", "empty it (~{}/mi)", "empty it"),
          "job": "Enjoy this part. You earned it.",
          "talk": "Nothing"},
     ]
