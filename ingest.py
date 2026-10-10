@@ -197,6 +197,53 @@ def upsert_activity(conn, a):
     )
 
 
+def _parse_gmt(ts):
+    try:
+        return dt.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S" if "T" in ts else "%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError):
+        return None
+
+
+def upsert_laps(conn, activity_id, splits):
+    """Store an activity's laps. Offsets come from lap start times, so pauses count."""
+    laps = (splits or {}).get("lapDTOs") or []
+    if not laps:
+        return 0
+    t0 = _parse_gmt(laps[0].get("startTimeGMT"))
+    offset = 0.0
+    conn.execute("DELETE FROM laps WHERE activity_id=?", (activity_id,))
+    for i, l in enumerate(laps, 1):
+        ts = _parse_gmt(l.get("startTimeGMT"))
+        start = (ts - t0).total_seconds() if (ts and t0) else offset
+        conn.execute(
+            """INSERT INTO laps (activity_id, lap_index, start_offset_s, distance_m, duration_s,
+                   moving_s, avg_hr, max_hr, elevation_gain, elevation_loss)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (activity_id, i, start, _num(l.get("distance")), _num(l.get("duration")),
+             _num(l.get("movingDuration")), _num(l.get("averageHR")), _num(l.get("maxHR")),
+             _num(l.get("elevationGain")), _num(l.get("elevationLoss"))))
+        offset = start + (_num(l.get("duration")) or 0)
+    return len(laps)
+
+
+def sync_laps(g, conn, limit=60):
+    """Fetch laps for outdoor runs that do not have them yet (one call per run, once)."""
+    rows = conn.execute(
+        """SELECT a.activity_id FROM activities a
+           WHERE a.type LIKE '%running%'
+             AND NOT EXISTS (SELECT 1 FROM laps l WHERE l.activity_id = a.activity_id)
+           ORDER BY a.start_local DESC LIMIT ?""", (limit,)).fetchall()
+    n = 0
+    for r in rows:
+        try:
+            n += upsert_laps(conn, r["activity_id"], g.get_activity_splits(r["activity_id"]))
+            conn.commit()
+        except Exception as e:
+            print(f"  laps {r['activity_id']}: {e}", file=sys.stderr)
+        time.sleep(0.3)
+    return n
+
+
 def run_intraday(days=1):
     """Just today's Body Battery / stress curve: one API call, runs often.
 
@@ -252,6 +299,11 @@ def run(days=3, activities_count=30):
         conn.commit()
     except Exception as e:
         print(f"  activities: {e}", file=sys.stderr)
+
+    try:
+        print(f"  laps: {sync_laps(g, conn)} stored")
+    except Exception as e:
+        print(f"  laps: {e}", file=sys.stderr)
 
     # Per-run weather (Garmin returns nulls for her device). Never fatal.
     try:

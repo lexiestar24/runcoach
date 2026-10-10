@@ -776,12 +776,12 @@ function raceCredits(P){
     el('span',{class:'est',text:P.measured?'MEASURED · ':'ESTIMATE · '}),
     el('span',{text:P.basis})]);
   const det=el('details',{class:'credits'},[
-    el('summary',{text:`How ${P.central_pace_str} is built: ${P.baseline_pace_str}/mi long-run pace, minus ${P.total_credit_sec} sec/mi`})]);
+    el('summary',{text:`How ${P.central_pace_str} is built: ${P.baseline_pace_str}/mi ${P.baseline_label||'long-run pace'}, minus ${P.total_credit_sec} sec/mi`})]);
   (P.credits||[]).forEach(c=>det.appendChild(el('div',{class:'credrow'},[
     el('div',{class:'cl'},[el('span',{text:c.label}),el('i',{text:c.why})]),
-    el('div',{class:'cv',text:`-${c.sec_per_mi}s`})])));
+    el('div',{class:'cv',text:c.sec_per_mi<0?`+${-c.sec_per_mi}s`:`-${c.sec_per_mi}s`})])));
   det.appendChild(el('div',{class:'credrow tot'},[
-    el('div',{class:'cl',text:'Total credit vs your current long-run pace'}),
+    el('div',{class:'cl',text:`Total credit vs your ${P.baseline_label||'long-run pace'}`}),
     el('div',{class:'cv',text:`-${P.total_credit_sec}s`})]));
   det.appendChild(el('div',{class:'rbasis',text:
     `1 bpm is worth ~${P.sec_per_bpm} sec/mi for you (${P.slope_fitted?`fitted from ${P.slope_n} of your own runs`:'default, not enough data to fit yours yet'}). `+
@@ -803,12 +803,19 @@ function racePhases(R){
 function raceGrp(d){
   const g=(d.plan||[]).filter(w=>/goal race pace/i.test((w.summary||'')+' '+(w.description||'')));
   if(!g.length) return null;
+  // the race-pace block itself, measured from laps by race.py
+  const segs={};((d.race&&d.race.projection&&d.race.projection.grp_sessions)||[]).forEach(s=>segs[s.date]=s);
   return el('div',{class:'grp'},g.map(w=>{
-    const a=w.actual;
+    const a=w.actual, s=segs[w.date];
+    let txt=w.status;
+    if(a&&s&&s.segment){
+      const air=s.eff_temp_f!=null?` · ${Math.round(s.temp_f)}F${s.eff_temp_f-s.temp_f>=2?` (~${Math.round(s.eff_temp_f)}F in sun)`:''}`:'';
+      txt=`race pace: ${s.grp_mi} mi @ ${s.pace_str}/mi, HR ${Math.round(s.avg_hr)}${air}. Whole run ${a.distance_mi} mi @ ${a.avg_pace_min_per_mi?fmtPace(a.avg_pace_min_per_mi):'--'}/mi`;
+    }else if(a) txt=`ran ${a.distance_mi} mi @ ${a.avg_pace_min_per_mi?fmtPace(a.avg_pace_min_per_mi):'--'} /mi, HR ${a.avg_hr||'--'}`;
     return el('div',{class:'grpc'+(a?' done':'')},[
       el('div',{class:'gd',text:fmtDate(w.date)}),
       el('div',{class:'gv',text:(w.summary.split(' - ')[1]||w.summary)}),
-      el('div',{class:'gs',text:a?`ran ${a.distance_mi} mi @ ${a.avg_pace_min_per_mi?fmtPace(a.avg_pace_min_per_mi):'--'} /mi, HR ${a.avg_hr||'--'}`:w.status})]);
+      el('div',{class:'gs',text:txt})]);
   }));
 }
 function raceNotes(R){

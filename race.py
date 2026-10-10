@@ -12,6 +12,7 @@ are used as direct evidence and the modelled credits are stood down (see
 `projection`). Before Oct 10 this is a model. After Oct 10 it is a measurement.
 """
 import datetime as dt
+import re
 import statistics
 
 import weather
@@ -124,23 +125,97 @@ def recent_long_runs(conn, n=5, min_mi=4.5):
     return list(reversed(out))
 
 
-def _grp_evidence(conn, plan_workouts):
-    """Actuals from the long runs that carried a goal-race-pace segment.
+_SEG_RE = re.compile(r"(last\s+)?(\d+(?:\.\d+)?)\s*(?:mi\s+)?(EASY|at GOAL RACE PACE)", re.I)
 
-    Once these exist they beat any model, so `projection` hands over to them.
+
+def grp_window(text, total_mi):
+    """(start_mi, end_mi) of the goal-race-pace block, read from the plan text.
+
+    Handles "8 EASY + last 2 at GOAL RACE PACE" (anchored to where she actually
+    finished, so a long or short run still reads its real last 2 miles) and
+    "4 EASY + 4 at GOAL RACE PACE + 4 EASY" (race pace in the middle).
+    """
+    at = 0.0
+    for last, n, kind in _SEG_RE.findall(text or ""):
+        n = float(n)
+        if "race" in kind.lower():
+            if last or not total_mi:
+                return (max((total_mi or n) - n, 0.0), total_mi or n)
+            return (at, at + n)
+        at += n
+    return None
+
+
+def _segment(conn, activity_id, start_mi, end_mi):
+    """Pace / HR / timing over [start_mi, end_mi], built from the run's laps.
+
+    A lap belongs to the block when its midpoint falls inside it, so mile auto-laps
+    and a manual lap press at the start of the block both work.
+    """
+    laps = conn.execute("SELECT * FROM laps WHERE activity_id=? ORDER BY lap_index",
+                        (activity_id,)).fetchall()
+    cum, picked = 0.0, []
+    for l in laps:
+        d = (l["distance_m"] or 0) / MILE_M
+        mid = cum + d / 2
+        if start_mi - 0.05 <= mid <= end_mi + 0.05 and d > 0:
+            picked.append(l)
+        cum += d
+    if not picked:
+        return None
+    dist = sum(l["distance_m"] for l in picked) / MILE_M
+    dur = sum(l["duration_s"] for l in picked)
+    hr_t = [(l["avg_hr"], l["duration_s"]) for l in picked if l["avg_hr"]]
+    hr = sum(h * t for h, t in hr_t) / sum(t for _, t in hr_t) if hr_t else None
+    return {
+        "distance_mi": round(dist, 2), "pace": (dur / 60.0) / dist if dist else None,
+        "avg_hr": round(hr, 1) if hr else None, "max_hr": max((l["max_hr"] or 0) for l in picked) or None,
+        "t0": picked[0]["start_offset_s"], "t1": picked[-1]["start_offset_s"] + picked[-1]["duration_s"],
+        "laps": [l["lap_index"] for l in picked],
+    }
+
+
+def _grp_evidence(conn, plan_workouts):
+    """Actuals from the goal-race-pace BLOCK of each long run that carried one.
+
+    Only the race-pace miles count: averaging in 8 easy miles would make race pace
+    look like long-run pace. Conditions are read for the block itself, from the
+    run's hourly weather, because a 9am start and an 11am finish in full sun are
+    not the same air. Falls back to the whole run (flagged) when laps are missing.
     Matched off the plan rather than a date list so editing the .ics is enough.
     """
+    cond = weather.by_activity(conn)
     out = []
     for w in plan_workouts or []:
         s = (w.get("summary") or "") + " " + (w.get("description") or "")
         if "goal race pace" not in s.lower() or not w.get("actual"):
             continue
         a = w["actual"]
-        out.append({
-            "date": w["date"], "summary": w["summary"],
-            "distance_mi": a.get("distance_mi"), "avg_hr": a.get("avg_hr"),
-            "pace": a.get("avg_pace_min_per_mi"),
-        })
+        c = cond.get(a.get("activity_id")) or {}
+        win = grp_window(w.get("description") or w.get("summary"), a.get("distance_mi"))
+        seg = _segment(conn, a["activity_id"], *win) if win else None
+        g = {"date": w["date"], "summary": w["summary"],
+             "distance_mi": a.get("distance_mi"), "run_pace": a.get("avg_pace_min_per_mi"),
+             "run_hr": a.get("avg_hr"), "segment": bool(seg)}
+        if seg:
+            t0 = (c.get("start_epoch") or 0) + seg["t0"] if c.get("start_epoch") else None
+            t1 = (c.get("start_epoch") or 0) + seg["t1"] if c.get("start_epoch") else None
+            wx = weather.window(c.get("hourly"), t0, t1) if (c.get("hourly") and t0) else None
+            g.update({"grp_mi": seg["distance_mi"], "pace": seg["pace"], "avg_hr": seg["avg_hr"],
+                      "max_hr": seg["max_hr"], "laps": seg["laps"],
+                      "window": [round(win[0], 2), round(win[1], 2)]})
+        else:
+            wx = None
+            g.update({"grp_mi": a.get("distance_mi"), "pace": a.get("avg_pace_min_per_mi"),
+                      "avg_hr": a.get("avg_hr")})
+        if wx:
+            g.update({"temp_f": wx["temp_f"], "dew_f": wx["dew_f"], "solar_wm2": wx["solar_wm2"],
+                      "eff_temp_f": wx["eff_temp_f"]})
+        elif c and not c.get("indoor"):
+            g.update({"temp_f": c.get("temp_f"), "dew_f": c.get("dew_f"),
+                      "solar_wm2": c.get("solar_wm2"), "eff_temp_f": c.get("eff_temp_f", c.get("temp_f"))})
+        g["pace_str"] = _fmt_pace(g.get("pace"))
+        out.append(g)
     return out
 
 
@@ -214,15 +289,40 @@ def projection(conn, plan_workouts=None, today=None):
     total = sum(c[1] for c in credits)
     central = base - total / 60.0
 
+    measured_base = None
     if grp:
-        # Direct evidence beats the model. Race pace is what she actually held for
-        # a goal-pace segment on tired legs, minus only the credits still ahead of
-        # her (taper, and whatever base building is left).
-        held = statistics.median([g["pace"] for g in grp if g["pace"]] or [central])
-        remaining = 12.0 + min(2.0 * weeks_out, 25.0)
-        central = held - remaining / 60.0
-        basis = (f"Measured: {len(grp)} goal-race-pace session(s) logged, median "
-                 f"{_fmt_pace(held)}/mi. Model stood down in favour of real data.")
+        # Direct evidence beats the model. Start from what she actually held over
+        # the race-pace miles, then correct only for what differs on race day:
+        # the air during those miles (heat + sun) vs a cold November morning, the
+        # effort she ran them at vs race effort, and the credits still ahead of her.
+        held = statistics.median([g["pace"] for g in grp if g.get("pace")] or [central])
+        hr = statistics.median([g["avg_hr"] for g in grp if g.get("avg_hr")] or [RACE_HR_MID])
+        eff = statistics.median([g["eff_temp_f"] for g in grp if g.get("eff_temp_f") is not None] or [base_temp])
+        dew = statistics.median([g["dew_f"] for g in grp if g.get("dew_f") is not None] or [RACE_DEW_F])
+        segs = sum(1 for g in grp if g.get("segment"))
+        credits = []
+        # Air temperature with the sun folded in (pace cost), and humidity alone
+        # (HR cost) so the temperature is not counted twice.
+        tcredit = (temp_pace_penalty_pct(eff) - temp_pace_penalty_pct(RACE_TEMP_F)) / 100.0 * held * 60
+        credits.append((f"Racing at ~35F instead of ~{eff:.0f}F (air + sun) during those miles", max(tcredit, 0),
+                        "heat for the race-pace miles themselves, not the start of the run"))
+        humid = max(weather.hr_heat_offset(None, dew) - weather.hr_heat_offset(None, RACE_DEW_F), 0) * sec_per_bpm
+        credits.append(("Humidity", humid, f"dew point ~{dew:.0f}F during the race-pace miles"))
+        effort = (RACE_HR_MID - hr) * sec_per_bpm
+        credits.append((f"Race effort (HR ~{RACE_HR_MID}) vs what you ran them at (HR ~{hr:.0f})", effort,
+                        "ran above race effort, so this one adds time back" if effort < 0 else
+                        "room left between what you ran and race effort"))
+        credits.append(("Taper (you have never run on fresh legs)", 12.0,
+                        "two weeks of reduced volume before the gun"))
+        credits.append((f"{weeks_out:.0f} more weeks of base building", min(2.0 * weeks_out, 25.0),
+                        "long run goes to 12 mi; conservative 2 sec/mi per week remaining"))
+        total = sum(c[1] for c in credits)
+        central = held - total / 60.0
+        measured_base = (held, hr)
+        basis = (f"Measured: {len(grp)} goal-race-pace session(s), median {_fmt_pace(held)}/mi at HR "
+                 f"{hr:.0f} over the race-pace miles only"
+                 + ("" if segs == len(grp) else " (some sessions had no laps; whole run used)")
+                 + ". Model stood down in favour of real data.")
     else:
         basis = (f"Modelled from {len(longs)} recent long runs (median {_fmt_pace(base)}/mi "
                  f"at HR {base_hr:.0f}, {base_temp:.0f}F). No goal-race-pace session logged yet.")
@@ -232,9 +332,10 @@ def projection(conn, plan_workouts=None, today=None):
         "available": True,
         "basis": basis,
         "measured": bool(grp),
-        "baseline_pace": round(base, 2),
-        "baseline_pace_str": _fmt_pace(base),
-        "baseline_hr": round(base_hr),
+        "baseline_pace": round(measured_base[0] if measured_base else base, 2),
+        "baseline_pace_str": _fmt_pace(measured_base[0] if measured_base else base),
+        "baseline_hr": round(measured_base[1] if measured_base else base_hr),
+        "baseline_label": "race-pace segment pace" if measured_base else "long-run pace",
         "baseline_temp_f": round(base_temp),
         "sec_per_bpm": sec_per_bpm,
         "slope_fitted": fitted,

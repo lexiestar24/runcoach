@@ -57,6 +57,22 @@ CREATE TABLE IF NOT EXISTS vo2max (
     updated_at      TEXT DEFAULT (datetime('now'))
 );
 
+-- Garmin laps (auto-lap = one per mile), so a segment such as the last 2 miles
+-- of a long run can be read on its own instead of averaged into the whole run.
+CREATE TABLE IF NOT EXISTS laps (
+    activity_id     INTEGER,
+    lap_index       INTEGER,            -- 1-based
+    start_offset_s  REAL,               -- seconds after the activity started
+    distance_m      REAL,
+    duration_s      REAL,
+    moving_s        REAL,
+    avg_hr          REAL,
+    max_hr          REAL,
+    elevation_gain  REAL,
+    elevation_loss  REAL,
+    PRIMARY KEY (activity_id, lap_index)
+);
+
 CREATE TABLE IF NOT EXISTS activities (
     activity_id     INTEGER PRIMARY KEY,
     start_local     TEXT,               -- 'YYYY-MM-DD HH:MM:SS'

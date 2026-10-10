@@ -1018,7 +1018,8 @@ def evaluate(w, conn=None, ctx=None):
         "easy-for-hard": "Completed, but easier than the workout called for.",
     }.get(rating, "Nice work.")
     return {"rating": rating, "headline": headline, "points": points,
-            "comparison": comparison, "conditions": cond or None,
+            "comparison": comparison,
+            "conditions": {k: v for k, v in cond.items() if k != "hourly"} or None,
             "readiness_that_day": ready["score"] if ready else None,
             "readiness_at": ready["at_label"] if (ready and started) else None,
             "readiness_morning": ready.get("morning_score") if ready else None}
