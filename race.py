@@ -57,6 +57,15 @@ WALK_EVERY_MI = 1.75
 WALK_S = 37.5                 # 30-45 sec
 WALK_PACE_MIN = 18.0          # brisk walk, min/mi
 
+# Miles past her longest training run are new ground; assume they cost a little
+# (no data on her late-race fade yet, so this is a conservative guess).
+FADE_SEC_PER_MI = 20.0
+
+# The Oct 12-21 shin break and the shortened return (long run tops out at 8-10
+# mi, not 12) mean the last weeks hold fitness rather than build it.
+BASE_BUILDING_SEC_PER_WEEK = 0.0
+BASE_BUILDING_WHY = "shin break: these weeks hold fitness, they don't add to it"
+
 # Nobody runs the measured line: weaving and wide corners put ~0.8% on the
 # distance actually covered, and the clock times that distance.
 COURSE_EXTRA = 0.008
@@ -297,9 +306,8 @@ def projection(conn, plan_workouts=None, today=None):
                     "two weeks of reduced volume before the gun"))
 
     # 4. Remaining aerobic development, decaying to nothing on race day.
-    fitness = min(2.0 * weeks_out, 25.0)
-    credits.append((f"{weeks_out:.0f} more weeks of base building", fitness,
-                    "long run goes to 12 mi; conservative 2 sec/mi per week remaining"))
+    fitness = min(BASE_BUILDING_SEC_PER_WEEK * weeks_out, 25.0)
+    credits.append(("No more base building", fitness, BASE_BUILDING_WHY))
 
     # 5. Race effort sits above long-run effort. This is the only credit she
     #    controls on the day, and the only one she can overspend.
@@ -335,8 +343,8 @@ def projection(conn, plan_workouts=None, today=None):
                         "room left between what you ran and race effort"))
         credits.append(("Taper (you have never run on fresh legs)", 12.0,
                         "two weeks of reduced volume before the gun"))
-        credits.append((f"{weeks_out:.0f} more weeks of base building", min(2.0 * weeks_out, 25.0),
-                        "long run goes to 12 mi; conservative 2 sec/mi per week remaining"))
+        credits.append(("No more base building",
+                        min(BASE_BUILDING_SEC_PER_WEEK * weeks_out, 25.0), BASE_BUILDING_WHY))
         total = sum(c[1] for c in credits)
         central = held - total / 60.0
         measured_base = (held, hr)
@@ -348,9 +356,10 @@ def projection(conn, plan_workouts=None, today=None):
         basis = (f"Modelled from {len(longs)} recent long runs (median {_fmt_pace(base)}/mi "
                  f"at HR {base_hr:.0f}, {base_temp:.0f}F). No goal-race-pace session logged yet.")
 
-    plan = race_plan(central, sec_per_bpm)
-    lo_plan = race_plan(central - 20 / 60.0, sec_per_bpm)
-    hi_plan = race_plan(central + 20 / 60.0, sec_per_bpm)
+    longest = max([l["distance_mi"] for l in recent_long_runs(conn, n=50) if not l["indoor"]] or [0.0])
+    plan = race_plan(central, sec_per_bpm, longest)
+    lo_plan = race_plan(central - 20 / 60.0, sec_per_bpm, longest)
+    hi_plan = race_plan(central + 20 / 60.0, sec_per_bpm, longest)
     return {
         "available": True,
         "basis": basis,
@@ -381,7 +390,7 @@ def projection(conn, plan_workouts=None, today=None):
     }
 
 
-def race_plan(effort_pace, sec_per_bpm):
+def race_plan(effort_pace, sec_per_bpm, longest_mi=None):
     """Finish time built phase by phase, with walk breaks and real distance covered.
 
     `effort_pace` is the running pace at race effort (HR 164). The first miles
@@ -399,13 +408,18 @@ def race_plan(effort_pace, sec_per_bpm):
     stops = int(12.0 // WALK_EVERY_MI)
     run_pace = effort_pace
     walk_cost_s = stops * (WALK_S - (WALK_S / (WALK_PACE_MIN * 60.0)) * run_pace * 60.0)
-    finish = run_min + walk_cost_s / 60.0
+    beyond = max(RACE_DISTANCE_MI - longest_mi, 0.0) if longest_mi else 0.0
+    fade_s = beyond * FADE_SEC_PER_MI
+    finish = run_min + (walk_cost_s + fade_s) / 60.0
     # Top of the opening HR band (162) marks the fastest the first 4 miles should go.
     ceiling = effort_pace + (RACE_HR_MID - 162) * sec_per_bpm / 60.0
     return {
         "phases": phases_out,
         "walk_stops": stops,
         "walk_cost_s": round(walk_cost_s),
+        "longest_mi": round(longest_mi, 1) if longest_mi else None,
+        "beyond_mi": round(beyond, 1),
+        "fade_cost_s": round(fade_s),
         "course_mi": round(RACE_DISTANCE_MI * k, 2),
         "finish_min": round(finish, 1),
         "avg_pace": finish / RACE_DISTANCE_MI,

@@ -794,6 +794,9 @@ function raceCredits(P){
     det.appendChild(el('div',{class:'credrow'},[
       el('div',{class:'cl'},[el('span',{text:`${rp.walk_stops} aid-station walk breaks`}),el('i',{text:'30-45 sec each; walking still covers ground, so only the difference counts'})]),
       el('div',{class:'cv',text:`+${rp.walk_cost_s}s`})]));
+    if(rp.fade_cost_s>0) det.appendChild(el('div',{class:'credrow'},[
+      el('div',{class:'cl'},[el('span',{text:`Last ${rp.beyond_mi} mi past your longest run (${rp.longest_mi} mi)`}),el('i',{text:'new ground, so allow ~20 sec/mi of fade there'})]),
+      el('div',{class:'cv',text:`+${rp.fade_cost_s}s`})]));
     det.appendChild(el('div',{class:'credrow'},[
       el('div',{class:'cl'},[el('span',{text:`${rp.course_mi} mi actually covered`}),el('i',{text:'weaving and corners; the clock times what you run, not 13.1'})]),
       el('div',{class:'cv',text:'incl.'})]));
