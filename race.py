@@ -205,6 +205,18 @@ def _segment(conn, activity_id, start_mi, end_mi):
     }
 
 
+# Race-pace blocks whose watch distance was corrupted by a GPS glitch, keyed by
+# run date. Pace is recomputed from steps x a clean-lap stride length (the lap
+# cadence and stride are measured by the accelerometer, not GPS), so the time is
+# real and only the distance is fixed.
+GPS_CORRECTED_GRP = {
+    # Mile 7 lap read 9:27 with stride 109 cm vs 91 cm on the clean mile 8:
+    # ~0.84 true mi, not 1.0. Block 1.95 mi in 20:42 = ~10:37/mi.
+    "2026-11-07": {"pace": 10.62, "grp_mi": 1.95,
+                   "note": "GPS glitch in mile 7, distance rebuilt from steps x stride"},
+}
+
+
 def _grp_evidence(conn, plan_workouts):
     """Actuals from the goal-race-pace BLOCK of each long run that carried one.
 
@@ -244,6 +256,9 @@ def _grp_evidence(conn, plan_workouts):
         elif c and not c.get("indoor"):
             g.update({"temp_f": c.get("temp_f"), "dew_f": c.get("dew_f"),
                       "solar_wm2": c.get("solar_wm2"), "eff_temp_f": c.get("eff_temp_f", c.get("temp_f"))})
+        fix = GPS_CORRECTED_GRP.get(str(w["date"]))
+        if fix:
+            g.update({"pace": fix["pace"], "grp_mi": fix["grp_mi"], "gps_note": fix["note"]})
         g["pace_str"] = _fmt_pace(g.get("pace"))
         out.append(g)
     return out
