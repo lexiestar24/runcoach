@@ -1,0 +1,25 @@
+[
+  {
+    "key": "sample-half",
+    "name": "Sample Half Marathon",
+    "date": "2026-01-01",
+    "activity_id": 0,
+    "official_mi": 13.1,
+    "recorded_mi": 13.1,
+    "chip_time": null,
+    "first": true,
+    "goals": [
+      [
+        "Finish",
+        true
+      ],
+      [
+        "Enjoy it",
+        true
+      ]
+    ],
+    "notes": [
+      "Free-text notes shown under the race."
+    ]
+  }
+]

@@ -1058,7 +1058,9 @@ def tips(conn):
     m = milestones(conn)
     if m["longest_run_mi"] and m["longest_run_mi"] >= 5:
         out.append({"kind": "win", "text":
-            f"Longest run so far is {m['longest_run_mi']} mi, and you're building real endurance. {m['weeks_to_race']} weeks to the Madison half."})
+            f"Longest run so far is {m['longest_run_mi']} mi, and you're building real endurance. {m['weeks_to_race']} weeks to the Madison half."
+            if m["weeks_to_race"] > 0 else
+            f"You ran {m['longest_run_mi']} mi at the Madison half: a half marathon in the books. Recover first; the next build starts from a much bigger base."})
     if m["vo2max_change"] and m["vo2max_change"] > 0:
         out.append({"kind": "win", "text":
             f"VO2max is trending up (+{m['vo2max_change']}). Aerobic fitness is responding. The slow easy miles are working."})
@@ -1089,8 +1091,8 @@ def adjustments(conn):
     run_min = usual_run_minute(conn, today)
     at_run = readiness(conn, at=run_min) if run_min and run_min > _now_minute() + 30 else ready
     for w in upcoming[:2]:
-        if w["type"] not in HARD_TYPES:
-            continue
+        if w["type"] not in HARD_TYPES or w.get("actual"):
+            continue   # nothing to adjust once it has been run
         r = at_run if w["date"] == today.isoformat() else ready
         if r["score"] < 55:
             when = (f"By {r['at_label']}, when you usually run, readiness projects to {r['score']}"

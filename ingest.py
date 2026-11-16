@@ -305,6 +305,15 @@ def run(days=3, activities_count=30):
     except Exception as e:
         print(f"  laps: {e}", file=sys.stderr)
 
+    # Race splits rebuilt from the GPS track, once per configured race
+    try:
+        import results
+        n = results.ensure(g, conn)
+        if n:
+            print(f"  race results built for {n} race(s)")
+    except Exception as e:
+        print(f"  race results: {e}", file=sys.stderr)
+
     # Per-run weather (Garmin returns nulls for her device). Never fatal.
     try:
         import weather

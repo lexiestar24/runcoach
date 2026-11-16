@@ -14,6 +14,7 @@ import db
 import engine
 import plan as planmod
 import race as racemod
+import results as resultsmod
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 app = FastAPI(title="RunCoach")
@@ -37,6 +38,7 @@ def dashboard():
         # race day is built from the plan we just resolved, so goal-race-pace
         # sessions can be matched to their actuals without a second parse
         data["race"] = racemod.summary(conn, data["plan"])
+        data["results"] = resultsmod.summary(conn, data["race"]["projection"])
         ctx = engine.evaluation_context(conn)
         for w in data["plan"]:
             if w.get("actual"):

@@ -284,6 +284,20 @@
   .grpc .gd{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
   .grpc .gv{font-size:15px;font-weight:650;margin-top:3px;line-height:1.25}
   .grpc .gs{font-size:12px;color:var(--text-2);margin-top:4px}
+  /* race results */
+  .goals{display:flex;gap:8px;flex-wrap:wrap}
+  .goal{font-size:12.5px;font-weight:650;padding:4px 11px;border-radius:999px;
+    background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--success-ink)}
+  .goal.miss{background:var(--surface-2);color:var(--muted)}
+  .resblock{margin-top:4px}
+  .resblock .lab{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin:6px 0 6px}
+  .credrow .cv.slow{color:var(--serious)}
+  table.splits{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+  table.splits th{font-size:11px;color:var(--muted);font-weight:600;text-align:right;padding:6px 6px;border-bottom:1px solid var(--grid)}
+  table.splits td{text-align:right;padding:6px 6px;border-bottom:1px solid var(--grid);color:var(--text-2)}
+  table.splits th:first-child,table.splits td:first-child{text-align:left}
+  ul.resnotes{margin:0;padding-left:18px;font-size:13px;color:var(--text-2);line-height:1.5}
+  ul.resnotes li{margin:4px 0}
 </style>
 </head>
 <body>
@@ -379,7 +393,7 @@ function dateIdx(n,w){
   out.push(n-1); return out;
 }
 function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],baseline=null,unit='',
-    ptColor=null,tipHtml=null,line=true,refs=[]}){
+    ptColor=null,tipHtml=null,line=true,refs=[],xLabel=d=>d.date.slice(5),axFmt=null}){
   const mob=MOBILE(), fs=FS();
   // Reference-line labels (baseline + refs) live in a right-hand margin, clear of
   // the plotted lines. Size the right pad to the widest such label so nothing overlaps.
@@ -416,7 +430,7 @@ function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],basel
       if(b.label)tag(pad.l+6,y1+13,b.color,mob?(b.short||b.label):b.label);}});
   ax.ticks.forEach(v=>{const y=Y(v);
     s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--grid'),'stroke-width':1}));
-    s.appendChild(el('text',{class:'yax',x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},ax.fmt(v)));});
+    s.appendChild(el('text',{class:'yax',x:pad.l-6,y:y+3,'text-anchor':'end',fill:cssv('--muted'),'font-size':fs.ax},(axFmt||ax.fmt)(v)));});
   if(baseline!=null){const y=Y(baseline);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv('--baseline'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
     if(!mob)marginLabel(y,'--muted',`baseline ${fmt(baseline)}`,false);}
   refs.forEach(r=>{const y=Y(r.y);s.appendChild(el('line',{x1:pad.l,y1:y,x2:pad.l+iw,y2:y,stroke:cssv(r.color||'--muted'),'stroke-width':1.5,'stroke-dasharray':'2 3'}));
@@ -434,7 +448,7 @@ function lineChart(data,{yKey,w=680,h=220,color='--blue',fmt=v=>v,bands=[],basel
   dateIdx(pts.length,w).forEach(i=>{if(pts[i])
     s.appendChild(el('text',{x:X(i),y:h-8,
       'text-anchor':i===0?'start':i===pts.length-1?'end':'middle',
-      fill:cssv('--muted'),'font-size':fs.date},pts[i].date.slice(5)));});
+      fill:cssv('--muted'),'font-size':fs.date},xLabel(pts[i])));});
   labels.forEach(l=>s.appendChild(l));  // labels on top
   // big invisible tap targets: full-height column per point, so a tap anywhere near a point selects it
   const spacing=pts.length>1?iw/(pts.length-1):iw;
@@ -631,7 +645,7 @@ function updateTrends(){
 
 function render(d){
   DATA=d;
-  $('#stamp').textContent = `updated ${d.generated_at.replace('T',' ')} · ${d.milestones.weeks_to_race} wks to race`;
+  $('#stamp').textContent = `updated ${d.generated_at.replace('T',' ')} · `+(d.milestones.weeks_to_race>0?`${d.milestones.weeks_to_race} wks to race`:'half marathon done');
   const app=$('#app'); app.innerHTML='';
   const R=d.readiness, M=d.milestones, W=d.weekly;
   const rc = R.score>=72?'--good':R.score>=55?'--warning':'--critical';
@@ -649,7 +663,7 @@ function render(d){
 
   // Milestone tiles
   const tiles=[
-    ['Weeks to race',M.weeks_to_race,'Madison half, Nov 15'],
+    M.weeks_to_race>0?['Weeks to race',M.weeks_to_race,'Madison half, Nov 15']:['Madison half','done ✓','finished Nov 15'],
     ['Plan week',`${M.current_week}<small>/21</small>`,`${M.consistency_pct}% workouts done`],
     ['Total miles',M.total_miles,`${M.total_runs} runs logged`],
     ['Longest run',`${M.longest_run_mi}<small>mi</small>`,'building endurance'],
@@ -664,6 +678,7 @@ function render(d){
   ]));
 
   // Race day: the point of the whole plan, so it sits above the week-to-week noise
+  const resSec=renderResults(d); if(resSec) app.appendChild(resSec);
   const raceSec=renderRace(d); if(raceSec) app.appendChild(raceSec);
 
   // Adjustments
@@ -768,6 +783,7 @@ function raceNums(R,P){
     n('Avg race pace (est.)', P.available?`${P.central_pace_str}<small>/mi</small>`:'--',
       P.available?`range ${P.band_str}, walks incl.`:'no long runs logged yet'),
     n('Projected finish', P.available?P.finish_central:'--', P.available?`range ${P.finish_band}`:''),
+    R.days_out<=0?n('Race day','done','see Race results above'):
     n('Race day', `${R.days_out}<small>days</small>`, `gun ${R.gun_time}`)];
 }
 function raceCredits(P){
@@ -850,13 +866,92 @@ function renderRace(d){
   const btn=el('button',{class:'racebtn',text:'Race details →'});
   btn.addEventListener('click',openRaceDetails);
   return el('section',{},[
-    el('h2',{text:'Race day'}),
+    el('h2',{text:R.days_out<=0?'Race projection (recalibrated)':'Race day'}),
     el('div',{class:'card racecard'},[
       el('div',{class:'rc-head',text:`Madison Half Marathon · Sun Nov 15 · ${R.where} · gun ${R.gun_time}`}),
       el('div',{class:'rc-nums racehero'},raceNums(R,P)),
       btn])]);
 }
 
+// ---------- race results ----------
+const mmss=p=>fmtPace(p);
+const fmtDelta=s=>`${s<0?'-':'+'}${Math.floor(Math.abs(s)/60)}:${String(Math.abs(s)%60).padStart(2,'0')}`;
+function renderResults(d){
+  const list=d.results||[]; if(!list.length) return null;
+  return el('section',{},[el('h2',{text:'Race results'}),el('div',{class:'stack'},list.map(r=>resultCard(r,d)))]);
+}
+function resultCard(r,d){
+  const n=(k,v,dd)=>el('div',{class:'rc-n'},[
+    el('div',{class:'k',text:k}),el('div',{class:'v',html:v}),el('div',{class:'d',text:dd||''})]);
+  const c=r.conditions||{};
+  const wx=c.temp_f!=null?`${Math.round(c.temp_f)}F to ${Math.round(c.temp_end_f||c.temp_f)}F, wind ${Math.round(c.wind_mph||0)} mph, ~${r.elevation_gain_ft} ft of climbing`:'';
+  const kids=[
+    el('div',{class:'rc-head',text:`${r.name} · ${fmtDate(r.date)}${r.first?' · first half marathon':''}${wx?' · '+wx:''}`}),
+    el('div',{class:'rc-nums racehero'},[
+      n(r.finish_is_chip?'Chip time':'Finish (watch)',r.finish,r.finish_is_chip?'official result':'official chip time not added yet'),
+      n('Avg pace',`${r.pace_official_str}<small>/mi</small>`,`over ${r.official_mi} mi; ${r.pace_recorded_str}/mi over the ${r.recorded_mi} you recorded`),
+      n('Heart rate',`${Math.round(r.avg_hr)}<small>avg</small>`,r.new_max_hr?`max ${Math.round(r.max_hr)}, a new high (was ${Math.round(r.prior_max_hr)})`:`max ${Math.round(r.max_hr)}`)]),
+    el('div',{class:'goals'},r.goals.map(g=>el('span',{class:'goal'+(g.met?'':' miss'),text:`${g.met?'✓':'✗'} ${g.label}`})))];
+  const sp=r.splits||[];
+  const lab=s=>String(s.mile);
+  const tip=s=>`<b>Mile ${lab(s)}</b>${s.pace_str}/mi · HR ${s.avg_hr??'--'}<br>${s.gain_ft} ft up, ${s.loss_ft} ft down`+(s.slow_pct?`<br>${s.slow_pct}% at walking speed`:'');
+  const P=(d.race&&d.race.projection)||{};
+  if(sp.length){
+    const refs=P.available?[{y:P.effort_pace,color:'--muted',label:`race effort ${P.effort_pace_str}`}]:[];
+    const pc=el('div',{class:'resblock'},[el('div',{class:'lab',text:'Pace by mile (lower is faster)'}),
+      lineChart(sp,{yKey:'pace',color:'--blue',refs,xLabel:lab,tipHtml:tip,axFmt:v=>mmss(v)})]);
+    if(refs.length) pc.appendChild(legend([{color:'--blue',label:'your pace'},{color:'--muted',dash:true,label:`recalibrated race effort pace ${P.effort_pace_str}/mi`}]));
+    kids.push(pc);
+    kids.push(el('div',{class:'resblock'},[el('div',{class:'lab',text:'Heart rate by mile'}),
+      lineChart(sp.filter(s=>s.avg_hr),{yKey:'avg_hr',color:'#ae5225',unit:' bpm',xLabel:lab,tipHtml:tip,
+        bands:[{lo:160,hi:168,color:'--blue',label:'race plan 160-168',short:'plan'}]})]));
+  }
+  if((r.segments||[]).length){
+    const box=el('div',{class:'resblock'},[el('div',{class:'lab',text:'Each phase vs the recalibrated plan'})]);
+    r.segments.forEach(s=>box.appendChild(el('div',{class:'credrow'},[
+      el('div',{class:'cl'},[el('span',{text:`Mi ${s.miles}: ${s.pace_str}/mi at HR ${s.avg_hr}`}),
+        el('i',{text:s.projected_pace_str?`plan ${s.projected_pace_str}/mi running pace`:''})]),
+      el('div',{class:'cv'+(s.delta_s>0?' slow':''),text:s.delta_s==null?'':`${fmtDelta(s.delta_s)}/mi`})])));
+    if(r.negative_split_s>0) box.appendChild(el('div',{class:'rbasis',text:
+      `Miles 10-13 were ${fmtDelta(r.negative_split_s).slice(1)}/mi faster than miles 1-4.`+(r.split_note?' '+r.split_note:'')}));
+    kids.push(box);
+  }
+  const pj=r.projection;
+  if(pj){
+    const rp=P.race_plan||{}, wpct=Math.round((P.evidence_weight||0)*100);
+    const box=el('div',{class:'resblock'},[el('div',{class:'lab',text:'Projection vs result'})]);
+    const row=(a,b,cv,bad)=>box.appendChild(el('div',{class:'credrow'},[
+      el('div',{class:'cl'},[el('span',{text:a}),el('i',{text:b})]),el('div',{class:'cv'+(bad?' slow':''),text:cv})]));
+    row(`Race-eve projection: ${pj.published_finish} (${pj.published_band})`,
+      `Projected ${pj.published_miss_min} min too fast. Built on ~4 mi of flat race-pace miles, with no hills, no crowd, and a range far too narrow.`,'missed',true);
+    row(`Recalibrated: ${pj.recal_finish} (${pj.recal_band})`,
+      `Same race-eve data, with the missing factors added. Your time is ${pj.recal_in_band?'inside':'outside'} the range, ${pj.recal_miss_min} min slower than the centre.`,pj.recal_in_band?'in range':'outside',!pj.recal_in_band);
+    const min=s=>`+${(s/60).toFixed(1)} min`;
+    const f=[
+      ['Race-pace evidence weighted by miles',`${wpct}% measured race-pace miles (${P.grp_effort_pace_str}/mi), ${100-wpct}% long-run model (${P.lr_effort_pace_str}/mi)`,P.effort_pace_str+'/mi'],
+      [`Hills: ${rp.extra_climb_ft} ft more climbing than your training`,`${rp.course_gain_ft} ft on the course vs ~${rp.train_ft_per_mi} ft/mi on your long-run routes`,min(rp.hill_cost_s)],
+      ['Crowded first 2 miles','weaving and pinch points',min(rp.congestion_s)],
+      ['Aid-station stops at ~60 sec','only the share not already inside your long-run pace',min(rp.walk_cost_s)],
+      [`${rp.beyond_mi} mi past your longest run`,'~20 sec/mi on new ground',min(rp.fade_cost_s)],
+      ['Wider, slow-leaning range','first races go slow far more often than fast; less race-pace data means a wider range',P.finish_band]];
+    const det=el('details',{class:'credits'},[el('summary',{text:'What the recalibration added'})]);
+    f.forEach(([a,b,cv])=>det.appendChild(el('div',{class:'credrow'},[el('div',{class:'cl'},[el('span',{text:a}),el('i',{text:b})]),el('div',{class:'cv',text:cv})])));
+    if(r.unmodelled) det.appendChild(el('div',{class:'rbasis',text:'Not modelled: '+r.unmodelled}));
+    box.appendChild(det);
+    kids.push(box);
+  }
+  if(sp.length){
+    const det=el('details',{class:'credits'},[el('summary',{text:'All splits'})]);
+    const tb=el('table',{class:'splits'},[el('tr',{},['Mile','Pace','HR','Max','Climb','Walk'].map(h=>el('th',{text:h})))]);
+    sp.forEach(s=>tb.appendChild(el('tr',{},[s.mile,s.pace_str,s.avg_hr??'--',s.max_hr??'--',`${s.gain_ft} ft`,`${s.slow_pct}%`].map(v=>el('td',{text:String(v)})))));
+    det.appendChild(tb);
+    det.appendChild(el('div',{class:'rbasis',text:`Splits rebuilt from the GPS track (${r.track_mi} mi measured, scaled to the ${r.recorded_mi} mi you recorded). The watch's own laps added up to ${r.raw_watch_mi} mi. Walk = share of the mile slower than ~14:00/mi.`+(r.data_note?' '+r.data_note:'')}));
+    kids.push(det);
+  }
+  if((r.notes||[]).length) kids.push(el('div',{class:'resblock'},[el('div',{class:'lab',text:'Notes'}),
+    el('ul',{class:'resnotes'},r.notes.map(t=>el('li',{text:t})))]));
+  return el('div',{class:'card racecard'},kids);
+}
 function openRaceDetails(){
   const d=DATA; if(!d||!d.race) return;
   const R=d.race, P=R.projection||{};

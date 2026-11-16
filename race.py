@@ -70,6 +70,45 @@ BASE_BUILDING_WHY = "shin break: these weeks hold fitness, they don't add to it"
 # distance actually covered, and the clock times that distance.
 COURSE_EXTRA = 0.008
 
+# ---- Recalibration after the Madison half (2026-11-15) ----------------------
+# The race-eve projection said 2:27 (2:22-2:31); the watch said 2:42:39. The
+# whole gap sat in miles 1-9: the last 4 miles ran at ~10:56, right on the
+# projected effort pace. Each constant below is something that was KNOWABLE
+# before the gun and that the first model left out. Nothing here is fitted to
+# the result; the result is only used to check the model lands near it.
+
+# 1. Thin evidence. ~4 mi of race-pace miles (two 2-mi blocks, at the end of
+#    flat runs) were treated as if they predicted 13.1. Weight them against the
+#    long-run model by how many miles of evidence there are: with E miles of
+#    race-pace data the measured pace gets E / (E + prior) of the say.
+EVIDENCE_PRIOR_MI = 6.0
+
+# 2. Hills. Her race-pace and long runs were on flat river paths; Madison
+#    climbs ~415 ft. Each foot climbed costs about as much as ~8 ft on the flat
+#    (Naismith-style rule) and a recreational runner gets back only about 45%
+#    of it on the way down. Only the climb BEYOND what her training routes had
+#    is charged, so a hilly training block would cancel it out.
+COURSE_GAIN_FT = 415.0
+CLIMB_EQUIV = 8.0
+DESCENT_RETURN = 0.45
+
+# 3. A crowded start. Thousands of runners funnel through the first 2 miles;
+#    weaving and pinch points cost about 45 s/mi there whatever the legs can do.
+CONGESTION_S = 90.0
+
+# 4. Real aid-station stops. A gel, a cup, and getting going again is closer
+#    to a minute than to the planned 30-45 sec.
+WALK_S_REAL = 60.0
+
+# 5. Asymmetric range. First races go slow far more often than fast, and the
+#    less race-pace evidence there is, the wider the slow side gets.
+BAND_FAST_S, BAND_SLOW_S = 10.0, 20.0          # with full evidence
+BAND_FAST_EXTRA, BAND_SLOW_EXTRA = 20.0, 40.0  # added as evidence -> 0
+
+# What was actually published on race eve, kept so the results page can show
+# the miss honestly rather than recomputing it with today's code.
+PUBLISHED_PROJECTION = {"finish": "2:27", "band": "2:22-2:31", "effort_pace": "10:51"}
+
 
 def _pace_min_per_mi(row):
     if not row["distance_m"] or not row["duration_s"]:
@@ -92,7 +131,13 @@ def temp_pace_penalty_pct(temp_f):
     return min(0.04 * (COOL_OPTIMUM_F - temp_f), 1.5)
 
 
-def hr_pace_slope(conn):
+def _as_of(as_of):
+    """Cut-off date (exclusive) for the evidence the projection may use."""
+    d = as_of or RACE_DATE
+    return d.isoformat() if hasattr(d, "isoformat") else str(d)
+
+
+def hr_pace_slope(conn, as_of=None):
     """Seconds per mile that one bpm is worth for her, fitted from her own runs.
 
     Regresses pace against heat-adjusted average HR over outdoor runs of 2.5 mi or
@@ -102,8 +147,8 @@ def hr_pace_slope(conn):
     cond = weather.by_activity(conn)
     pts = []
     for r in conn.execute(
-        "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= ? ORDER BY date",
-        (TRAINING_START,),
+        "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= ? AND date < ? ORDER BY date",
+        (TRAINING_START, _as_of(as_of)),
     ).fetchall():
         c = cond.get(r["activity_id"], {})
         pace = _pace_min_per_mi(r)
@@ -126,13 +171,13 @@ def hr_pace_slope(conn):
     return (round(sec, 2) if fitted else DEFAULT_SEC_PER_BPM), len(pts), fitted
 
 
-def recent_long_runs(conn, n=5, min_mi=4.5):
-    """Her last few real long runs, with conditions attached."""
+def recent_long_runs(conn, n=5, min_mi=4.5, as_of=None):
+    """Her last few real long runs before `as_of` (default race day), with conditions."""
     cond = weather.by_activity(conn)
     out = []
     for r in conn.execute(
-        "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= ? ORDER BY date DESC",
-        (TRAINING_START,),
+        "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= ? AND date < ? ORDER BY date DESC",
+        (TRAINING_START, _as_of(as_of)),
     ).fetchall():
         if (r["distance_m"] or 0) / MILE_M < min_mi:
             continue
@@ -149,6 +194,7 @@ def recent_long_runs(conn, n=5, min_mi=4.5):
             "dew_f": c.get("dew_f"),
             "indoor": bool(c.get("indoor")),
             "heat_bpm": c.get("hr_heat_offset") or 0.0,
+            "gain_ft_per_mi": ((r["elevation_gain"] or 0) * 3.28084) / ((r["distance_m"] or 1) / MILE_M),
         })
         if len(out) >= n:
             break
@@ -217,7 +263,7 @@ GPS_CORRECTED_GRP = {
 }
 
 
-def _grp_evidence(conn, plan_workouts):
+def _grp_evidence(conn, plan_workouts, as_of=None):
     """Actuals from the goal-race-pace BLOCK of each long run that carried one.
 
     Only the race-pace miles count: averaging in 8 easy miles would make race pace
@@ -231,6 +277,8 @@ def _grp_evidence(conn, plan_workouts):
     for w in plan_workouts or []:
         s = (w.get("summary") or "") + " " + (w.get("description") or "")
         if "goal race pace" not in s.lower() or not w.get("actual"):
+            continue
+        if str(w["date"]) >= _as_of(as_of):
             continue
         a = w["actual"]
         c = cond.get(a.get("activity_id")) or {}
@@ -282,151 +330,164 @@ def _fmt_time(total_min):
     return f"{h}:{m:02d}"
 
 
-def projection(conn, plan_workouts=None, today=None):
-    """Goal race pace, as a band, with every credit shown separately.
-
-    Model: take the median pace of her recent long runs, then add back what the
-    conditions and the calendar are holding down. Credits are deliberately
-    conservative -- the failure mode that ruins a first half is a projection that
-    is too fast, believed at mile 2.
-    """
-    today = today or dt.date.today()
-    weeks_out = max((RACE_DATE - today).days, 0) / 7.0
-    sec_per_bpm, n_pts, fitted = hr_pace_slope(conn)
-    longs = [l for l in recent_long_runs(conn) if not l["indoor"]]
-
-    grp = _grp_evidence(conn, plan_workouts)
-    if not longs:
-        return {"available": False, "reason": "No outdoor long runs logged yet."}
-
+def _long_run_model(longs, sec_per_bpm, weeks_out):
+    """Race effort pace modelled from her long runs (whole-run pace, walks incl.)."""
     base = statistics.median([l["pace"] for l in longs])
     base_hr = statistics.median([l["avg_hr"] for l in longs if l["avg_hr"]] or [158])
     base_temp = statistics.median([l["temp_f"] for l in longs if l["temp_f"]] or [68])
     base_heat = statistics.median([l["heat_bpm"] for l in longs])
-
     credits = []
-
-    # 1. Humidity. Her long runs carry a dew-point HR tax; race morning carries none.
     humid = max(base_heat - weather.hr_heat_offset(RACE_TEMP_F, RACE_DEW_F), 0) * sec_per_bpm
     credits.append(("Cool, dry air (vs summer dew point)", humid,
                     f"long runs cost ~{base_heat:.1f} bpm to humidity; race morning ~0"))
-
-    # 2. Air temperature, separately from humidity (see temp_pace_penalty_pct).
     tcredit = (temp_pace_penalty_pct(base_temp) - temp_pace_penalty_pct(RACE_TEMP_F)) / 100.0 * base * 60
     credits.append(("Racing at ~35F instead of ~%.0fF" % base_temp, max(tcredit, 0),
                     "air temperature alone, on top of the humidity credit"))
-
-    # 3. Taper. She has never once run rested; every long run sits on training legs.
     credits.append(("Taper (you have never run on fresh legs)", 12.0,
                     "two weeks of reduced volume before the gun"))
-
-    # 4. Remaining aerobic development, decaying to nothing on race day.
-    fitness = min(BASE_BUILDING_SEC_PER_WEEK * weeks_out, 25.0)
-    credits.append(("No more base building", fitness, BASE_BUILDING_WHY))
-
-    # 5. Race effort sits above long-run effort. This is the only credit she
-    #    controls on the day, and the only one she can overspend.
+    credits.append(("No more base building", min(BASE_BUILDING_SEC_PER_WEEK * weeks_out, 25.0),
+                    BASE_BUILDING_WHY))
     effort = max(RACE_HR_MID - base_hr, 0) * sec_per_bpm
     credits.append((f"Race effort (HR ~{RACE_HR_MID}) vs long-run effort (HR ~{base_hr:.0f})", effort,
                     "the only credit you spend on the day, and the only one you can overspend"))
-
     total = sum(c[1] for c in credits)
-    central = base - total / 60.0
+    return {"pace": base - total / 60.0, "base": base, "hr": base_hr, "temp": base_temp,
+            "credits": credits, "total": total}
 
-    measured_base = None
-    if grp:
-        # Direct evidence beats the model. Start from what she actually held over
-        # the race-pace miles, then correct only for what differs on race day:
-        # the air during those miles (heat + sun) vs a cold November morning, the
-        # effort she ran them at vs race effort, and the credits still ahead of her.
-        held = statistics.median([g["pace"] for g in grp if g.get("pace")] or [central])
-        hr = statistics.median([g["avg_hr"] for g in grp if g.get("avg_hr")] or [RACE_HR_MID])
-        eff = statistics.median([g["eff_temp_f"] for g in grp if g.get("eff_temp_f") is not None] or [base_temp])
-        dew = statistics.median([g["dew_f"] for g in grp if g.get("dew_f") is not None] or [RACE_DEW_F])
-        segs = sum(1 for g in grp if g.get("segment"))
-        credits = []
-        # Air temperature with the sun folded in (pace cost), and humidity alone
-        # (HR cost) so the temperature is not counted twice.
-        tcredit = (temp_pace_penalty_pct(eff) - temp_pace_penalty_pct(RACE_TEMP_F)) / 100.0 * held * 60
-        credits.append((f"Racing at ~35F instead of ~{eff:.0f}F (air + sun) during those miles", max(tcredit, 0),
-                        "heat for the race-pace miles themselves, not the start of the run"))
-        humid = max(weather.hr_heat_offset(None, dew) - weather.hr_heat_offset(None, RACE_DEW_F), 0) * sec_per_bpm
-        credits.append(("Humidity", humid, f"dew point ~{dew:.0f}F during the race-pace miles"))
-        effort = (RACE_HR_MID - hr) * sec_per_bpm
-        credits.append((f"Race effort (HR ~{RACE_HR_MID}) vs what you ran them at (HR ~{hr:.0f})", effort,
-                        "ran above race effort, so this one adds time back" if effort < 0 else
-                        "room left between what you ran and race effort"))
-        credits.append(("Taper (you have never run on fresh legs)", 12.0,
-                        "two weeks of reduced volume before the gun"))
-        credits.append(("No more base building",
-                        min(BASE_BUILDING_SEC_PER_WEEK * weeks_out, 25.0), BASE_BUILDING_WHY))
-        total = sum(c[1] for c in credits)
-        central = held - total / 60.0
-        measured_base = (held, hr)
-        basis = (f"Measured: {len(grp)} goal-race-pace session(s), median {_fmt_pace(held)}/mi at HR "
-                 f"{hr:.0f} over the race-pace miles only"
-                 + ("" if segs == len(grp) else " (some sessions had no laps; whole run used)")
-                 + ". Model stood down in favour of real data.")
+
+def _grp_model(grp, sec_per_bpm, weeks_out, fallback_temp):
+    """Race effort pace from the race-pace miles she actually ran."""
+    held = statistics.median([g["pace"] for g in grp if g.get("pace")])
+    hr = statistics.median([g["avg_hr"] for g in grp if g.get("avg_hr")] or [RACE_HR_MID])
+    eff = statistics.median([g["eff_temp_f"] for g in grp if g.get("eff_temp_f") is not None] or [fallback_temp])
+    dew = statistics.median([g["dew_f"] for g in grp if g.get("dew_f") is not None] or [RACE_DEW_F])
+    credits = []
+    tcredit = (temp_pace_penalty_pct(eff) - temp_pace_penalty_pct(RACE_TEMP_F)) / 100.0 * held * 60
+    credits.append((f"Racing at ~35F instead of ~{eff:.0f}F (air + sun) during those miles", max(tcredit, 0),
+                    "heat for the race-pace miles themselves, not the start of the run"))
+    humid = max(weather.hr_heat_offset(None, dew) - weather.hr_heat_offset(None, RACE_DEW_F), 0) * sec_per_bpm
+    credits.append(("Humidity", humid, f"dew point ~{dew:.0f}F during the race-pace miles"))
+    effort = (RACE_HR_MID - hr) * sec_per_bpm
+    credits.append((f"Race effort (HR ~{RACE_HR_MID}) vs what you ran them at (HR ~{hr:.0f})", effort,
+                    "ran above race effort, so this one adds time back" if effort < 0 else
+                    "room left between what you ran and race effort"))
+    credits.append(("Taper (you have never run on fresh legs)", 12.0,
+                    "two weeks of reduced volume before the gun"))
+    credits.append(("No more base building", min(BASE_BUILDING_SEC_PER_WEEK * weeks_out, 25.0),
+                    BASE_BUILDING_WHY))
+    total = sum(c[1] for c in credits)
+    return {"pace": held - total / 60.0, "base": held, "hr": hr, "credits": credits, "total": total,
+            "miles": sum(g.get("grp_mi") or 0 for g in grp),
+            "segs": sum(1 for g in grp if g.get("segment"))}
+
+
+def projection(conn, plan_workouts=None, today=None, as_of=None):
+    """Race effort pace and finish time, as an asymmetric band, every term shown.
+
+    Two independent estimates of race effort pace: one from the race-pace miles
+    she actually ran (direct, but only a few miles of it), one from her long runs
+    (lots of miles, but at a lower effort). They are blended by how much
+    race-pace evidence exists, then the race plan adds what the course and the
+    crowd cost. `as_of` freezes the inputs (default: race day, so after the race
+    this still shows what the model said the night before).
+    """
+    today = today or dt.date.today()
+    as_of = as_of or min(today + dt.timedelta(days=1), RACE_DATE)
+    weeks_out = max((RACE_DATE - min(today, RACE_DATE)).days, 0) / 7.0
+    sec_per_bpm, n_pts, fitted = hr_pace_slope(conn, as_of)
+    longs = [l for l in recent_long_runs(conn, as_of=as_of) if not l["indoor"]]
+    if not longs:
+        return {"available": False, "reason": "No outdoor long runs logged yet."}
+    grp = _grp_evidence(conn, plan_workouts, as_of)
+
+    lr = _long_run_model(longs, sec_per_bpm, weeks_out)
+    gm = _grp_model(grp, sec_per_bpm, weeks_out, lr["temp"]) if grp else None
+    if gm:
+        w = gm["miles"] / (gm["miles"] + EVIDENCE_PRIOR_MI)
+        central = w * gm["pace"] + (1 - w) * lr["pace"]
+        credits = gm["credits"]
+        basis = (f"Blended: {gm['miles']:.1f} mi of measured race-pace miles (median {_fmt_pace(gm['base'])}/mi "
+                 f"at HR {gm['hr']:.0f}) give race effort {_fmt_pace(gm['pace'])}/mi; {len(longs)} recent long "
+                 f"runs (median {_fmt_pace(lr['base'])}/mi at HR {lr['hr']:.0f}) give {_fmt_pace(lr['pace'])}/mi. "
+                 f"With only {gm['miles']:.1f} mi of race-pace evidence, the measured number gets "
+                 f"{w * 100:.0f}% of the say.")
     else:
-        basis = (f"Modelled from {len(longs)} recent long runs (median {_fmt_pace(base)}/mi "
-                 f"at HR {base_hr:.0f}, {base_temp:.0f}F). No goal-race-pace session logged yet.")
+        w = 0.0
+        central = lr["pace"]
+        credits = lr["credits"]
+        basis = (f"Modelled from {len(longs)} recent long runs (median {_fmt_pace(lr['base'])}/mi "
+                 f"at HR {lr['hr']:.0f}, {lr['temp']:.0f}F). No goal-race-pace session logged yet.")
 
-    longest = max([l["distance_mi"] for l in recent_long_runs(conn, n=50) if not l["indoor"]] or [0.0])
-    plan = race_plan(central, sec_per_bpm, longest)
-    lo_plan = race_plan(central - 20 / 60.0, sec_per_bpm, longest)
-    hi_plan = race_plan(central + 20 / 60.0, sec_per_bpm, longest)
+    longest = max([l["distance_mi"] for l in recent_long_runs(conn, n=50, as_of=as_of) if not l["indoor"]] or [0.0])
+    train_climb = statistics.median([l["gain_ft_per_mi"] for l in longs])
+    kw = dict(longest_mi=longest, train_ft_per_mi=train_climb, walk_share=w)
+    plan = race_plan(central, sec_per_bpm, **kw)
+    fast = (BAND_FAST_S + BAND_FAST_EXTRA * (1 - w)) / 60.0
+    slow = (BAND_SLOW_S + BAND_SLOW_EXTRA * (1 - w)) / 60.0
+    lo_plan = race_plan(central - fast, sec_per_bpm, **kw)
+    hi_plan = race_plan(central + slow, sec_per_bpm, **kw)
     return {
         "available": True,
+        "as_of": str(as_of),
         "basis": basis,
         "measured": bool(grp),
-        "baseline_pace": round(measured_base[0] if measured_base else base, 2),
-        "baseline_pace_str": _fmt_pace(measured_base[0] if measured_base else base),
-        "baseline_hr": round(measured_base[1] if measured_base else base_hr),
-        "baseline_label": "race-pace segment pace" if measured_base else "long-run pace",
-        "baseline_temp_f": round(base_temp),
+        "evidence_weight": round(w, 2),
+        "grp_effort_pace_str": _fmt_pace(gm["pace"]) if gm else None,
+        "lr_effort_pace_str": _fmt_pace(lr["pace"]),
+        "baseline_pace": round(gm["base"] if gm else lr["base"], 2),
+        "baseline_pace_str": _fmt_pace(gm["base"] if gm else lr["base"]),
+        "baseline_hr": round(gm["hr"] if gm else lr["hr"]),
+        "baseline_label": "race-pace segment pace" if gm else "long-run pace",
+        "baseline_temp_f": round(lr["temp"]),
         "sec_per_bpm": sec_per_bpm,
         "slope_fitted": fitted,
         "slope_n": n_pts,
         "weeks_out": round(weeks_out, 1),
-        "credits": [{"label": l, "sec_per_mi": round(v), "why": w} for l, v, w in credits],
-        "total_credit_sec": round(total),
-        # race-effort running pace (HR 164), before phases and walk breaks
+        "credits": [{"label": l, "sec_per_mi": round(v), "why": wy} for l, v, wy in credits],
+        "total_credit_sec": round(gm["total"] if gm else lr["total"]),
         "effort_pace": round(central, 2),
         "effort_pace_str": _fmt_pace(central),
-        # what the official result will say: finish / 13.1, walks included
         "central_pace": round(plan["avg_pace"], 2),
         "central_pace_str": _fmt_pace(plan["avg_pace"]),
         "band_str": f"{_fmt_pace(lo_plan['avg_pace'])}-{_fmt_pace(hi_plan['avg_pace'])}",
         "finish_central": _fmt_time(plan["finish_min"]),
         "finish_band": f"{_fmt_time(lo_plan['finish_min'])}-{_fmt_time(hi_plan['finish_min'])}",
+        "finish_min": plan["finish_min"],
+        "finish_lo_min": lo_plan["finish_min"],
+        "finish_hi_min": hi_plan["finish_min"],
         "ceiling_first_4mi": _fmt_pace(plan["ceiling_first_4mi"]),
         "race_plan": plan,
         "grp_sessions": grp,
+        "published": PUBLISHED_PROJECTION,
     }
 
 
-def race_plan(effort_pace, sec_per_bpm, longest_mi=None):
-    """Finish time built phase by phase, with walk breaks and real distance covered.
+def race_plan(effort_pace, sec_per_bpm, longest_mi=None, train_ft_per_mi=0.0, walk_share=1.0):
+    """Finish time built phase by phase, plus everything the course and crowd cost.
 
     `effort_pace` is the running pace at race effort (HR 164). The first miles
-    run below it and the last ones above it; the planned walks and the extra
-    distance nobody avoids are added on top. Returns per-phase paces too.
+    run below it and the last ones above it. On top: aid-station walks (only the
+    share not already inside long-run pace, which includes her usual walks),
+    miles past her longest run, climbing beyond what her training routes had,
+    and the crowded first two miles.
     """
     k = COURSE_EXTRA + 1.0
-    phases_out, run_min, mile_at = [], 0.0, 0.0
+    phases_out, run_min = [], 0.0
     for label, miles, band, hr in PHASES:
         pace = effort_pace + (RACE_HR_MID - hr) * sec_per_bpm / 60.0
         run_min += pace * miles * k
         phases_out.append({"miles": label, "hr": band, "pace": round(pace, 2),
                            "pace_str": _fmt_pace(pace), "minutes": round(pace * miles * k, 1)})
-        mile_at += miles
     stops = int(12.0 // WALK_EVERY_MI)
-    run_pace = effort_pace
-    walk_cost_s = stops * (WALK_S - (WALK_S / (WALK_PACE_MIN * 60.0)) * run_pace * 60.0)
+    run_s_per_mi = effort_pace * 60.0
+    walk_each = WALK_S_REAL - (WALK_S_REAL / (WALK_PACE_MIN * 60.0)) * run_s_per_mi
+    walk_cost_s = stops * walk_each * walk_share
     beyond = max(RACE_DISTANCE_MI - longest_mi, 0.0) if longest_mi else 0.0
     fade_s = beyond * FADE_SEC_PER_MI
-    finish = run_min + (walk_cost_s + fade_s) / 60.0
-    # Top of the opening HR band (162) marks the fastest the first 4 miles should go.
+    course_ft_per_mi = COURSE_GAIN_FT / RACE_DISTANCE_MI
+    extra_climb_ft = max(course_ft_per_mi - (train_ft_per_mi or 0.0), 0.0) * RACE_DISTANCE_MI
+    hill_s = extra_climb_ft * CLIMB_EQUIV * (run_s_per_mi / 5280.0) * (1 - DESCENT_RETURN)
+    finish = run_min + (walk_cost_s + fade_s + hill_s + CONGESTION_S) / 60.0
     ceiling = effort_pace + (RACE_HR_MID - 162) * sec_per_bpm / 60.0
     return {
         "phases": phases_out,
@@ -435,6 +496,11 @@ def race_plan(effort_pace, sec_per_bpm, longest_mi=None):
         "longest_mi": round(longest_mi, 1) if longest_mi else None,
         "beyond_mi": round(beyond, 1),
         "fade_cost_s": round(fade_s),
+        "course_gain_ft": round(COURSE_GAIN_FT),
+        "train_ft_per_mi": round(train_ft_per_mi or 0, 1),
+        "extra_climb_ft": round(extra_climb_ft),
+        "hill_cost_s": round(hill_s),
+        "congestion_s": round(CONGESTION_S),
         "course_mi": round(RACE_DISTANCE_MI * k, 2),
         "finish_min": round(finish, 1),
         "avg_pace": finish / RACE_DISTANCE_MI,
