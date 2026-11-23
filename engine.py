@@ -720,20 +720,29 @@ def weekly_load(conn):
 
 
 # ---------- milestones ----------
+def plan_start():
+    """Milestones and charts count from the active plan's first day, so each
+    plan starts clean; archived plans keep their own numbers in their snapshot."""
+    return plansmod.active().get("start") or TRAINING_START
+
+
 def milestones(conn):
-    runs = _rows(conn, "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= '" + TRAINING_START + "' ORDER BY start_local")
+    since = plan_start()
+    runs = _rows(conn, "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= ? ORDER BY start_local", (since,))
     total_mi = sum((r["distance_m"] or 0) for r in runs) / MILE_M
     longest = max(((r["distance_m"] or 0) / MILE_M for r in runs), default=0)
+    ever = conn.execute("SELECT MAX(distance_m) FROM activities WHERE type LIKE '%running%' AND date >= ?",
+                        (TRAINING_START,)).fetchone()[0] or 0
     # Prefer the watch's own VO2max (the vo2max table); per-run values lag it.
-    # Trend = latest vs the reading ~6 weeks back, on the precise decimals.
+    # Trend = latest vs where this plan started (the last reading on or before
+    # its first day), on the precise decimals.
     watch = _rows(conn, "SELECT date, value, precise FROM vo2max WHERE date >= ? ORDER BY date",
                   (TRAINING_START,))
     if watch:
         vo2 = [r["value"] for r in watch]
-        cutoff = (dt.date.fromisoformat(watch[-1]["date"]) - dt.timedelta(days=42)).isoformat()
-        base = next((r for r in watch if r["date"] >= cutoff), watch[0])
         prec = lambda r: r["precise"] or r["value"]
-        vo2_recent = [prec(base), prec(watch[-1])]
+        base = next((r for r in reversed(watch) if r["date"] <= since), watch[0])
+        vo2_recent = [prec(base), prec(watch[-1])] if watch[-1]["date"] > since else []
     else:
         vo2 = [r["vo2max"] for r in runs if r["vo2max"]]
         # trend over the recent training block, not all-time (avoids pre-training readings)
@@ -760,6 +769,8 @@ def milestones(conn):
         "total_runs": len(runs),
         "total_miles": round(total_mi, 1),
         "longest_run_mi": round(longest, 1),
+        "longest_ever_mi": round(ever / MILE_M, 1),
+        "since": since,
         "vo2max": vo2[-1] if vo2 else None,
         "vo2max_change": round(vo2_recent[-1] - vo2_recent[0], 1) if len(vo2_recent) > 1 else None,
         "days_to_race": days_to_race,
@@ -1091,7 +1102,7 @@ def tips(conn):
         b = m["block"]
         out.append({"kind": "win", "text":
             f"{b['name']} block ({_short_date(b['start'])} to {_short_date(b['end'])}): {b.get('focus', '')} "
-            f"You already have a {m['longest_run_mi']} mi longest run in the bank, so this winter is about getting sharper, not longer."})
+            f"You already have a {m['longest_ever_mi']} mi longest run in the bank, so this winter is about getting sharper, not longer."})
     if m["vo2max_change"] and m["vo2max_change"] > 0:
         out.append({"kind": "win", "text":
             f"VO2max is trending up (+{m['vo2max_change']}). Aerobic fitness is responding. The slow easy miles are working."})
@@ -1190,7 +1201,7 @@ def adjustments(conn):
 def series(conn):
     """Time series for the dashboard charts. Everything starts at plan week 1,
     so the charts' "All" view really is all of training, not a rolling window."""
-    since = TRAINING_START
+    since = plan_start()
     daily = _rows(conn, "SELECT * FROM daily WHERE date >= ? ORDER BY date", (since,))
     sleep = _rows(conn, "SELECT * FROM sleep WHERE date >= ? ORDER BY date", (since,))
     sleep_by = {s["date"]: s for s in sleep}
@@ -1205,8 +1216,10 @@ def series(conn):
     # Per-run HR + pace history (running only). Tag each run's *intended effort*
     # by matching its date to a planned workout: easy (shakeout/easy/long/quality)
     # vs hard (tempo/race). Off-plan runs default to easy.
-    runs = _rows(conn,
+    # all runs since training began: the easy-HR band is physiology, not a plan
+    all_runs = _rows(conn,
         "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= '" + TRAINING_START + "' ORDER BY start_local", ())
+    runs = [r for r in all_runs if r["date"] >= since]
     match_type = {}
     all_plans = planmod.all_plans_with_actuals(conn)
     for w in all_plans:
@@ -1221,13 +1234,13 @@ def series(conn):
         "vo2max": r["vo2max"],
         "intent": "hard" if match_type.get(r["date"]) in QUALITY_TYPES else "easy",
         "planned_type": match_type.get(r["date"]),
-    } for r in runs]
+    } for r in all_runs]
 
     # Weekly mileage planned vs actual across every plan, keyed by plan + week
     # number (week numbers restart with each plan)
     weeks = {}
     for w in all_plans:
-        if w["week"] is None:
+        if w["week"] is None or w["date"] < since:
             continue
         wk = (w.get("plan", ""), w["week"])
         weeks.setdefault(wk, {"week": w["week"], "plan": w.get("plan"), "planned": 0.0, "actual": 0.0, "start": w["date"]})
@@ -1264,7 +1277,8 @@ def series(conn):
     else:
         easy_band = {"lo": 150, "hi": 160, "median": 155}
 
-    return {"recovery": recovery, "runs": run_hist, "weekly": weekly, "easy_band": easy_band}
+    return {"recovery": recovery, "runs": [r for r in run_hist if r["date"] >= since],
+            "weekly": weekly, "easy_band": easy_band, "since": since}
 
 
 def add_conflict(conn, date, note=""):

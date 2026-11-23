@@ -564,7 +564,9 @@ function dayShift(iso,n){const d=new Date(iso+'T00:00');d.setDate(d.getDate()+n)
 function trendWindow(){
   const rec=DATA.series.recovery;
   const minD=rec.length?rec[0].date:null, maxD=rec.length?rec[rec.length-1].date:null;
-  if(winState.all||!rec.length) return {start:minD,end:maxD,atOldest:true,atNewest:true};
+  // a brand-new plan has no days yet: an empty window that says when it begins
+  if(!rec.length) return {start:DATA.series.since||'',end:DATA.series.since||'',atOldest:true,atNewest:true,empty:true};
+  if(winState.all) return {start:minD,end:maxD,atOldest:true,atNewest:true};
   const end=dayShift(maxD,-winState.offset*7);
   const start=dayShift(end,-(winState.weeks*7-1));
   return {start,end,atOldest:start<=minD,atNewest:winState.offset<=0};
@@ -606,7 +608,7 @@ function updateTrends(){
     const next=el('button',{class:'stepbtn',html:'newer ›'});
     if(w.atOldest)prev.setAttribute('disabled','');else prev.addEventListener('click',()=>{winState.offset++;updateTrends();});
     if(w.atNewest)next.setAttribute('disabled','');else next.addEventListener('click',()=>{winState.offset=Math.max(0,winState.offset-1);updateTrends();});
-    ctl.appendChild(el('div',{class:'stepper'},[prev,el('span',{class:'winlab',text:`${fmtDate(w.start)} – ${fmtDate(w.end)}`}),next]));
+    ctl.appendChild(el('div',{class:'stepper'},[prev,el('span',{class:'winlab',text:w.empty?`plan starts ${fmtDate(w.start)}`:`${fmtDate(w.start)} – ${fmtDate(w.end)}`}),next]));
   }
   // ---- charts ----
   grid.innerHTML='';
@@ -691,9 +693,10 @@ function render(d){
       :['Plan',M.plan_name||'–',M.plan_end?`through ${fmtDate(M.plan_end)}`:''],
     ['Plan week',`${M.current_week??'–'}<small>/${M.total_weeks??'–'}</small>`,
       M.consistency_pct!=null?`${M.consistency_pct}% workouts done`:'nothing due yet'],
-    ['Total miles',M.total_miles,`${M.total_runs} runs logged`],
-    ['Longest run',`${M.longest_run_mi}<small>mi</small>`,'building endurance'],
-    ['VO₂max',(M.vo2max!=null?M.vo2max:'–'), M.vo2max_change>0?`<span class="up">▲ +${M.vo2max_change}</span> recent`:(M.vo2max_change!=null?`${M.vo2max_change} recent`:'')],
+    ['Total miles',M.total_miles,`${M.total_runs} runs this plan`],
+    ['Longest run',`${M.longest_run_mi}<small>mi</small>`,`this plan · longest ever ${M.longest_ever_mi} mi`],
+    ['VO₂max',(M.vo2max!=null?M.vo2max:'–'), M.vo2max_change>0?`<span class="up">▲ +${M.vo2max_change}</span> this plan`
+      :(M.vo2max_change!=null?`${M.vo2max_change} this plan`:`at plan start`)],
     ['This week',`${W.actual_miles}<small>/${W.planned_miles} mi</small>`,`${W.runs_done}/${W.runs_planned} runs`],
   ];
   app.appendChild(el('section',{},[
