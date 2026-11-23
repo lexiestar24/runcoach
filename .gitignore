@@ -16,3 +16,5 @@ venv/
 .idea/
 .vscode/
 races.json
+plans.json
+archive/

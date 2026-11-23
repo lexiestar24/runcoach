@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 import db
 import engine
 import plan as planmod
+import plans as plansmod
 import race as racemod
 import results as resultsmod
 
@@ -34,11 +35,17 @@ def dashboard():
             "adjustments": engine.adjustments(conn),
             "series": engine.series(conn),
             "plan": planmod.plan_with_actuals(conn),
+            "active_plan": plansmod.public(plansmod.active()),
+            "plans": [plansmod.public(p) for p in plansmod.load()],
+            "race": None,
+            "results": [],
         }
-        # race day is built from the plan we just resolved, so goal-race-pace
-        # sessions can be matched to their actuals without a second parse
-        data["race"] = racemod.summary(conn, data["plan"])
-        data["results"] = resultsmod.summary(conn, data["race"]["projection"])
+        # Race day only exists for a plan that ends in a race. It is built from
+        # the plan we just resolved, so goal-race-pace sessions can be matched to
+        # their actuals without a second parse.
+        if data["active_plan"].get("race"):
+            data["race"] = racemod.summary(conn, data["plan"])
+            data["results"] = resultsmod.summary(conn, data["race"]["projection"])
         ctx = engine.evaluation_context(conn)
         for w in data["plan"]:
             if w.get("actual"):
@@ -46,6 +53,16 @@ def dashboard():
     finally:
         conn.close()
     return JSONResponse(data)
+
+
+@app.get("/api/archive/{key}")
+def archived_plan(key: str):
+    """A finished plan's frozen snapshot (see archive.py)."""
+    meta = plansmod.get(key)
+    path = plansmod.archive_path(key)
+    if not meta or meta.get("status") != "archived" or not os.path.exists(path):
+        return JSONResponse({"error": "no archive for that plan"}, status_code=404)
+    return FileResponse(path, media_type="application/json")
 
 
 @app.post("/api/conflict")

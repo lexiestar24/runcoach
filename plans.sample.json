@@ -1,0 +1,25 @@
+[
+  {
+    "key": "winter-2026",
+    "name": "Winter base 2026-27",
+    "short": "Winter",
+    "status": "active",
+    "ics": "~/plans/winter.ics",
+    "start": "2026-11-23",
+    "end": "2027-02-28",
+    "blocks": [
+      {"name": "Easing back", "start": "2026-11-23", "end": "2026-12-06", "focus": "Short and easy after the race."},
+      {"name": "Speed", "start": "2026-12-07", "end": "2027-01-03", "focus": "Thursday intervals; 5K time trial in week 4."}
+    ]
+  },
+  {
+    "key": "spring-half-2026",
+    "name": "Spring Half Marathon",
+    "short": "Spring Half",
+    "status": "archived",
+    "ics": "~/plans/spring-half.ics",
+    "start": "2026-03-01",
+    "end": "2026-05-10",
+    "race": {"key": "spring-half-2026", "name": "Spring Half Marathon", "date": "2026-05-10"}
+  }
+]

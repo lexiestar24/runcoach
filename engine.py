@@ -9,10 +9,11 @@ import statistics
 import db
 import plan as planmod
 
-RACE_DATE = dt.date(2026, 11, 15)   # Madison Half, gun 7:00 AM
+import plans as plansmod
 TRAINING_START = "2026-06-22"   # plan week 1; ignore pre-plan May runs
 MILE_M = 1609.344
-HARD_TYPES = {"tempo", "interval", "long", "race"}
+HARD_TYPES = {"tempo", "interval", "long", "race", "trial"}
+QUALITY_TYPES = ("tempo", "interval", "race", "trial")   # hard by intent, for the charts
 
 
 # ---------- small helpers ----------
@@ -604,6 +605,15 @@ def session_guidance(r, workout):
         bail += [f"HR stays above ~162 even with walk breaks", "you feel heavy or are forcing it",
                  "a headache or nausea starts"]
         steps.append(f"If you cut it short, repeat {mi:g} mi next week instead of stepping up.")
+    elif wtype == "trial":
+        # a time trial on a tired body only measures the tiredness
+        intro = ("Move the 5K time trial to a day when readiness is back up; a benchmark "
+                 "run tired just sets slow paces for the next block. Run easy today instead.")
+        steps += [
+            f"Run {_miles(min(mi, 3))} mi easy with full sentences, or rest.",
+            "Re-slot the time trial later this week or early next, not the day before a Saturday run.",
+        ]
+        bail += ["HR spikes well above normal for the effort", "a headache or nausea starts"]
     elif wtype in ("tempo", "interval"):
         if label == "Moderate":
             block = "about two-thirds of the planned tempo"
@@ -729,19 +739,31 @@ def milestones(conn):
         # trend over the recent training block, not all-time (avoids pre-training readings)
         vo2_recent = vo2[-6:]
     today = dt.date.today()
-    days_to_race = (RACE_DATE - today).days
+    meta = plansmod.active()
+    race = meta.get("race") or {}
+    days_to_race = (dt.date.fromisoformat(race["date"]) - today).days if race.get("date") else None
     plan = planmod.load_plan()
     cur = next((w for w in plan if w["date"] >= today.isoformat()), None)
     done = sum(1 for w in planmod.plan_with_actuals(conn) if w["status"] == "done")
     elapsed = sum(1 for w in plan if w["date"] < today.isoformat())
+    blocks = meta.get("blocks") or []
+    block = next((b for b in blocks if b["start"] <= today.isoformat() <= b["end"]), None)
+    if block is None and blocks and today.isoformat() < blocks[0]["start"]:
+        block = blocks[0]
     return {
+        "plan_name": meta.get("name"),
+        "race_name": race.get("name"),
+        "race_date": race.get("date"),
+        "plan_end": meta.get("end"),
+        "total_weeks": max((w["week"] or 0 for w in plan), default=None),
+        "block": block,
         "total_runs": len(runs),
         "total_miles": round(total_mi, 1),
         "longest_run_mi": round(longest, 1),
         "vo2max": vo2[-1] if vo2 else None,
         "vo2max_change": round(vo2_recent[-1] - vo2_recent[0], 1) if len(vo2_recent) > 1 else None,
         "days_to_race": days_to_race,
-        "weeks_to_race": round(days_to_race / 7, 1),
+        "weeks_to_race": round(days_to_race / 7, 1) if days_to_race is not None else None,
         "current_week": cur["week"] if cur else None,
         "workouts_done": done,
         "workouts_elapsed": elapsed,
@@ -793,7 +815,7 @@ def evaluation_context(conn):
     except Exception:
         cond = {}
 
-    done = [w for w in planmod.plan_with_actuals(conn) if w.get("status") == "done"]
+    done = [w for w in planmod.all_plans_with_actuals(conn) if w.get("status") == "done"]
     done.sort(key=lambda w: w["actual"].get("date") or w["date"])
 
     cohorts = {}
@@ -1026,6 +1048,11 @@ def evaluate(w, conn=None, ctx=None):
 
 
 # ---------- tips ----------
+def _short_date(iso):
+    d = dt.date.fromisoformat(iso)
+    return f"{d:%b} {d.day}"
+
+
 def tips(conn):
     out = []
     daily = _recent_daily(conn, 14)
@@ -1056,11 +1083,15 @@ def tips(conn):
 
     # Positive reinforcement
     m = milestones(conn)
-    if m["longest_run_mi"] and m["longest_run_mi"] >= 5:
+    if m["weeks_to_race"] is not None and m["weeks_to_race"] > 0 and m["longest_run_mi"] >= 5:
         out.append({"kind": "win", "text":
-            f"Longest run so far is {m['longest_run_mi']} mi, and you're building real endurance. {m['weeks_to_race']} weeks to the Madison half."
-            if m["weeks_to_race"] > 0 else
-            f"You ran {m['longest_run_mi']} mi at the Madison half: a half marathon in the books. Recover first; the next build starts from a much bigger base."})
+            f"Longest run so far is {m['longest_run_mi']} mi, and you're building real endurance. "
+            f"{m['weeks_to_race']} weeks to {m['race_name'] or 'race day'}."})
+    elif m.get("block"):
+        b = m["block"]
+        out.append({"kind": "win", "text":
+            f"{b['name']} block ({_short_date(b['start'])} to {_short_date(b['end'])}): {b.get('focus', '')} "
+            f"You already have a {m['longest_run_mi']} mi longest run in the bank, so this winter is about getting sharper, not longer."})
     if m["vo2max_change"] and m["vo2max_change"] > 0:
         out.append({"kind": "win", "text":
             f"VO2max is trending up (+{m['vo2max_change']}). Aerobic fitness is responding. The slow easy miles are working."})
@@ -1148,7 +1179,7 @@ def adjustments(conn):
         w = recent_missed[-1]
         moved = f" (already moved from {w['date']})" if w.get("rescheduled") else ""
         out.append({"severity": "low", "date": _due(w),
-            "text": f"Missed the {_due(w)} {w['type']} ({w['planned_miles']} mi){moved}. Don't cram it back in. Just resume the schedule; one missed session won't hurt the Madison goal."})
+            "text": f"Missed the {_due(w)} {w['type']} ({w['planned_miles']} mi){moved}. Don't cram it back in. Just resume the schedule; one missed session won't change the bigger picture."})
 
     if not out:
         out.append({"severity": "low", "date": None,
@@ -1177,7 +1208,8 @@ def series(conn):
     runs = _rows(conn,
         "SELECT * FROM activities WHERE type LIKE '%running%' AND date >= '" + TRAINING_START + "' ORDER BY start_local", ())
     match_type = {}
-    for w in planmod.plan_with_actuals(conn):
+    all_plans = planmod.all_plans_with_actuals(conn)
+    for w in all_plans:
         if w.get("actual"):
             match_type[w.get("moved_to") or w["date"]] = w["type"]
     run_hist = [{
@@ -1187,18 +1219,18 @@ def series(conn):
         "max_hr": r["max_hr"],
         "pace_min_per_mi": round((r["avg_pace_s_per_km"] or 0) * (MILE_M / 1000) / 60, 2) if r["avg_pace_s_per_km"] else None,
         "vo2max": r["vo2max"],
-        "intent": "hard" if match_type.get(r["date"]) in ("tempo", "interval", "race") else "easy",
+        "intent": "hard" if match_type.get(r["date"]) in QUALITY_TYPES else "easy",
         "planned_type": match_type.get(r["date"]),
     } for r in runs]
 
-    # Weekly mileage planned vs actual across the whole plan
-    plan = planmod.load_plan()
+    # Weekly mileage planned vs actual across every plan, keyed by plan + week
+    # number (week numbers restart with each plan)
     weeks = {}
-    for w in plan:
-        wk = w["week"]
-        if wk is None:
+    for w in all_plans:
+        if w["week"] is None:
             continue
-        weeks.setdefault(wk, {"week": wk, "planned": 0.0, "actual": 0.0, "start": w["date"]})
+        wk = (w.get("plan", ""), w["week"])
+        weeks.setdefault(wk, {"week": w["week"], "plan": w.get("plan"), "planned": 0.0, "actual": 0.0, "start": w["date"]})
         weeks[wk]["planned"] += w["planned_miles"] or 0
     for r in runs:
         d = dt.date.fromisoformat(r["date"])
@@ -1211,11 +1243,12 @@ def series(conn):
     # carry each week's Mon-Sun span so the dashboard can filter this chart to the
     # same time window as the others
     weekly = []
-    for v in sorted(weeks.values(), key=lambda x: x["week"]):
+    for v in sorted(weeks.values(), key=lambda x: x["start"]):
         ws = dt.date.fromisoformat(v["start"])
         wmon = ws - dt.timedelta(days=ws.weekday())
         weekly.append({
             "week": v["week"],
+            "plan": v["plan"],
             "planned": round(v["planned"], 1),
             "actual": round(v["actual"], 1),
             "start": wmon.isoformat(),

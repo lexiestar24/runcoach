@@ -28,12 +28,14 @@ def _classify(summary, desc):
     s = (summary + " " + workout).lower()
     if "half marathon" in s or "13.1" in s:
         return "race"
+    if "time trial" in s:
+        return "trial"
     if "shakeout" in s:
         return "shakeout"
     if "long run" in s:
         return "long"
     # rep work in miles ("2 x 0.75 mi") = intervals; note "4 x 20-sec" strides won't match
-    if "interval" in s or re.search(r"\d+\s*[x×]\s*[\d.]+\s*mi", s):
+    if "interval" in s or re.search(r"\d+\s*[x×]\s*[\d.]+\s*mi\b", s):
         return "interval"
     if "comfortably-hard" in s or "tempo" in s or "goal pace" in s:
         return "tempo"
@@ -54,7 +56,7 @@ def _planned_miles(summary, desc):
 _TYPE_LABEL = {
     "shakeout": "easy shakeout", "long": "long run", "tempo": "tempo",
     "interval": "intervals", "quality": "easy + strides", "easy": "easy run",
-    "race": "HALF MARATHON",
+    "race": "HALF MARATHON", "trial": "5K time trial",
 }
 
 
@@ -75,9 +77,18 @@ def _repair_summary(summary, wtype, miles):
     return f"{head} - {miles:g} mi {_TYPE_LABEL.get(wtype, wtype)}"
 
 
-def load_plan():
-    """Return a list of workout dicts sorted by date."""
-    with open(ICS_PATH, "r", encoding="utf-8") as f:
+def active_ics():
+    """The active plan's .ics (plans.json), falling back to RUNCOACH_ICS."""
+    try:
+        import plans
+        return plans.active().get("ics") or ICS_PATH
+    except Exception:
+        return ICS_PATH
+
+
+def load_plan(path=None):
+    """Return a list of workout dicts sorted by date (active plan by default)."""
+    with open(path or active_ics(), "r", encoding="utf-8") as f:
         raw = _unfold(f.read())
 
     workouts = []
@@ -114,13 +125,13 @@ def load_plan():
     return workouts
 
 
-def plan_with_actuals(conn):
+def plan_with_actuals(conn, path=None):
     """Join each planned workout to the run activity on the same date (if any).
 
     A workout can be rescheduled to a different day (reschedules table); if so we
     look for the run on the new date instead of the originally planned one.
     """
-    plan = load_plan()
+    plan = load_plan(path)
     runs = {}
     for r in conn.execute(
         "SELECT * FROM activities WHERE type LIKE '%running%' ORDER BY start_local"
@@ -174,6 +185,28 @@ def plan_with_actuals(conn):
             # that has not arrived yet.
             item["status"] = "upcoming" if match_date >= dt.date.today().isoformat() else "missed"
         out.append(item)
+    return out
+
+
+def all_plans_with_actuals(conn):
+    """Every plan's workouts, archived and active, in date order.
+
+    Used where history matters more than the current block: tagging runs as
+    easy or hard for the charts, and comparing a run with earlier runs of the
+    same kind. Each workout carries the plan it came from.
+    """
+    import plans
+    out, seen = [], set()
+    for p in plans.load():
+        if not p.get("ics") or not os.path.exists(p["ics"]):
+            continue
+        for w in plan_with_actuals(conn, p["ics"]):
+            if w["date"] in seen:
+                continue
+            seen.add(w["date"])
+            w["plan"] = p.get("short") or p["key"]
+            out.append(w)
+    out.sort(key=lambda w: w["date"])
     return out
 
 

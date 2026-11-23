@@ -298,6 +298,22 @@
   table.splits th:first-child,table.splits td:first-child{text-align:left}
   ul.resnotes{margin:0;padding-left:18px;font-size:13px;color:var(--text-2);line-height:1.5}
   ul.resnotes li{margin:4px 0}
+  /* plan tabs */
+  .plantabs{display:flex;gap:6px;margin:-6px 0 6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .plantabs::-webkit-scrollbar{display:none}
+  .plantabs button{flex:0 0 auto;box-shadow:none;border-radius:999px;padding:7px 14px;font-size:13.5px;
+    color:var(--text-2);background:transparent}
+  .plantabs button[aria-selected="true"]{background:var(--surface-2);color:var(--text);border-color:var(--text-2);font-weight:650}
+  .plantabs .tabtag{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-left:6px;font-weight:600}
+  /* plan overview */
+  .blocks{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .blk{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
+  .blk.now{border-color:var(--good)}
+  .blk .bn{font-weight:650;font-size:15px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  .blk .bd{font-size:12px;color:var(--muted);margin-top:2px}
+  .blk .bf{font-size:13px;color:var(--text-2);margin-top:6px;line-height:1.45}
+  .blk .nowtag{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--success-ink);font-weight:700}
+  .archnote{font-size:12.5px;color:var(--muted);margin-top:10px}
 </style>
 </head>
 <body>
@@ -309,6 +325,7 @@
     </div>
     <button id="refresh">↻ Sync Garmin</button>
   </header>
+  <nav class="plantabs" id="plantabs" role="tablist" aria-label="Training plans"></nav>
   <div id="app"><div class="loading">Loading your data…</div></div>
 </div>
 <div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
@@ -326,7 +343,7 @@ const SVGNS='http://www.w3.org/2000/svg',HTMLNS='http://www.w3.org/1999/xhtml';
 const SVGTAGS=new Set(['svg','g','path','rect','line','circle','text','polyline','defs','clipPath']);
 const cssv=n=>n&&n.startsWith('--')?getComputedStyle(document.documentElement).getPropertyValue(n).trim():n;
 // Effort-based coloring: easy days vs hard days, matching the effort chart's dots.
-const HARD_SET=new Set(['tempo','interval','race']);
+const HARD_SET=new Set(['tempo','interval','race','trial']);
 const effortColor=t=>HARD_SET.has(t)?'--red':'--blue';
 
 // short date like "Jul 18"
@@ -356,6 +373,10 @@ let SCHED=[], schedIdx=0;
 let pastOpen=false; try{pastOpen=localStorage.getItem('rc.pastOpen')==='1';}catch(e){}
 // dashboard data + the trends time-window (default: latest 2 weeks, step by week)
 let DATA=null, winState={all:false, weeks:2, offset:0};
+// which tab is showing: 'active' (live dashboard) or an archived plan's key
+let VIEW='active'; try{VIEW=localStorage.getItem('rc.view')||'active';}catch(e){}
+const ARCH={};          // archived snapshots, fetched once per page load
+let RACEVIEW=null;      // whichever race the race-details sheet should open
 
 // ---------- chart helpers (inline SVG) ----------
 function svgEl(w,h){return el('svg',{viewBox:`0 0 ${w} ${h}`,width:w,height:h,role:'img'});}
@@ -473,7 +494,7 @@ function groupedBars(data,{w=680,h=240}){
   data.forEach((d,i)=>{const x0=pad.l+bw*i+(bw-inner)/2;
     const mk=(val,off,color,cls)=>{const y=Y(val),bh=pad.t+ih-y;
       const r=el('rect',{x:x0+off,y,width:each-2,height:Math.max(0,bh),rx:3,fill:cssv(color)});
-      bindTip(r,`<b>Week ${d.week}</b>Planned: ${d.planned} mi<br>Actual: ${d.actual} mi`);s.appendChild(r);};
+      bindTip(r,`<b>${d.plan?d.plan+' · ':''}Week ${d.week}</b>Planned: ${d.planned} mi<br>Actual: ${d.actual} mi`);s.appendChild(r);};
     mk(d.planned,0,'--baseline','planned'); mk(d.actual,each,'--blue','actual');
     if(i%2===0||data.length<=12)s.appendChild(el('text',{x:x0+inner/2,y:h-16,'text-anchor':'middle',fill:cssv('--muted'),'font-size':mob?13:9},d.week));
   });
@@ -645,7 +666,9 @@ function updateTrends(){
 
 function render(d){
   DATA=d;
-  $('#stamp').textContent = `updated ${d.generated_at.replace('T',' ')} · `+(d.milestones.weeks_to_race>0?`${d.milestones.weeks_to_race} wks to race`:'half marathon done');
+  const M0=d.milestones;
+  $('#stamp').textContent = `updated ${d.generated_at.replace('T',' ')} · `+
+    (M0.weeks_to_race>0?`${M0.weeks_to_race} wks to race`:M0.block?`${M0.block.name} block`:(M0.plan_name||''));
   const app=$('#app'); app.innerHTML='';
   const R=d.readiness, M=d.milestones, W=d.weekly;
   const rc = R.score>=72?'--good':R.score>=55?'--warning':'--critical';
@@ -663,8 +686,11 @@ function render(d){
 
   // Milestone tiles
   const tiles=[
-    M.weeks_to_race>0?['Weeks to race',M.weeks_to_race,'Madison half, Nov 15']:['Madison half','done ✓','finished Nov 15'],
-    ['Plan week',`${M.current_week}<small>/21</small>`,`${M.consistency_pct}% workouts done`],
+    M.weeks_to_race!=null&&M.weeks_to_race>0?['Weeks to race',M.weeks_to_race,`${M.race_name||'race'}, ${fmtDate(M.race_date)}`]
+      :M.block?['Block',M.block.name,`${fmtDate(M.block.start)} – ${fmtDate(M.block.end)}`]
+      :['Plan',M.plan_name||'–',M.plan_end?`through ${fmtDate(M.plan_end)}`:''],
+    ['Plan week',`${M.current_week??'–'}<small>/${M.total_weeks??'–'}</small>`,
+      M.consistency_pct!=null?`${M.consistency_pct}% workouts done`:'nothing due yet'],
     ['Total miles',M.total_miles,`${M.total_runs} runs logged`],
     ['Longest run',`${M.longest_run_mi}<small>mi</small>`,'building endurance'],
     ['VO₂max',(M.vo2max!=null?M.vo2max:'–'), M.vo2max_change>0?`<span class="up">▲ +${M.vo2max_change}</span> recent`:(M.vo2max_change!=null?`${M.vo2max_change} recent`:'')],
@@ -678,8 +704,10 @@ function render(d){
   ]));
 
   // Race day: the point of the whole plan, so it sits above the week-to-week noise
+  RACEVIEW=d.race;
   const resSec=renderResults(d); if(resSec) app.appendChild(resSec);
   const raceSec=renderRace(d); if(raceSec) app.appendChild(raceSec);
+  const ov=renderOverview(d.active_plan, d.plan); if(ov) app.appendChild(ov);
 
   // Adjustments
   app.appendChild(el('section',{},[
@@ -704,18 +732,23 @@ function render(d){
     el('div',{class:'grid',id:'chartgrid',style:'gap:14px'})]));
   updateTrends();
 
-  // Full schedule from the plan start (6/22), grouped by week.
-  // Built as a stacked list rather than a wide table: six columns of workout data
-  // never fit a phone without sideways scrolling, so each workout gets two lines
-  // (identity on top, plan vs actual underneath) that wrap instead of overflow.
-  SCHED=d.plan.slice().sort((a,b)=>a.date<b.date?-1:1);
+  app.appendChild(renderSchedule(d.plan,{}));
+}
+
+// Full schedule from the plan start, grouped by week.
+// Built as a stacked list rather than a wide table: six columns of workout data
+// never fit a phone without sideways scrolling, so each workout gets two lines
+// (identity on top, plan vs actual underneath) that wrap instead of overflow.
+// readonly (an archived plan): nothing can be moved, and every week stays open.
+function renderSchedule(planRows,{readonly}){
+  SCHED=planRows.slice().sort((a,b)=>a.date<b.date?-1:1);
   const list=el('div',{class:'sched'});
   // Weeks that ended before this Monday fold into one block behind a toggle;
   // the current week and everything ahead always stay open.
   const now=new Date(), mon=new Date(now.getFullYear(),now.getMonth(),now.getDate()-((now.getDay()+6)%7));
   const monISO=`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
   const wkEnd={}; SCHED.forEach(w=>{if(!wkEnd[w.week]||w.date>wkEnd[w.week])wkEnd[w.week]=w.date;});
-  const isPast=w=>wkEnd[w.week]<monISO;
+  const isPast=w=>!readonly&&wkEnd[w.week]<monISO;
   const pastWeeks=new Set(SCHED.filter(isPast).map(w=>w.week));
   const past=el('div',{class:'pastwks'});
   if(pastWeeks.size){
@@ -752,7 +785,7 @@ function render(d){
         el('span',{class:`pill ${w.rescheduled&&w.status==='upcoming'?'moved':w.status}`,
           text:w.rescheduled&&w.status==='upcoming'?'moved':w.status}),
         // only runs still ahead of you can be moved; a logged run has happened
-        w.status!=='done'?mkMoveBtn(i):null,
+        w.status!=='done'&&!readonly?mkMoveBtn(i):null,
         el('span',{class:'chev',text:'›'})]),
       el('div',{class:'sr-bot'},[
         stat('plan',w.planned_miles?`${w.planned_miles} mi`:'rest'),
@@ -763,8 +796,63 @@ function render(d){
     row.addEventListener('click',()=>openDetail(i));
     row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(i);}});
     into.appendChild(row);});
-  app.appendChild(el('section',{},[el('h2',{text:'Schedule'}),
-    el('div',{class:'card schedcard'},list)]));
+  return el('section',{},[el('h2',{text:'Schedule'}),
+    el('div',{class:'card schedcard'},list)]);
+}
+
+// The plan at a glance: its blocks (current one marked) and standing notes.
+// Mostly for reading a new plan over before it goes on the calendar.
+function renderOverview(P,rows){
+  if(!P||!(P.blocks||[]).length) return null;
+  const today=new Date().toISOString().slice(0,10);
+  const mi=b=>rows.filter(w=>w.date>=b.start&&w.date<=b.end).reduce((s,w)=>s+(w.planned_miles||0),0);
+  const wks=b=>Math.round((new Date(b.end)-new Date(b.start))/864e5/7);
+  const kids=[el('h2',{text:`${P.name}: plan overview`}),
+    el('div',{class:'blocks'},P.blocks.map(b=>{const now=b.start<=today&&today<=b.end;
+      return el('div',{class:'blk'+(now?' now':'')},[
+        el('div',{class:'bn'},[el('span',{text:b.name}),now?el('span',{class:'nowtag',text:'now'}):null]),
+        el('div',{class:'bd',text:`${fmtDate(b.start)} – ${fmtDate(b.end)} · ${wks(b)} wks · ${Math.round(mi(b)*10)/10} mi planned`}),
+        el('div',{class:'bf',text:b.focus||''})]);}))];
+  if((P.notes||[]).length) kids.push(el('div',{class:'card',style:'margin-top:10px'},
+    el('ul',{class:'resnotes'},P.notes.map(t=>el('li',{text:t})))));
+  return el('section',{},kids);
+}
+
+// ---------- archived plan (read-only snapshot) ----------
+function renderArchive(s){
+  const app=$('#app'); app.innerHTML='';
+  const P=s.plan, S=s.stats;
+  $('#stamp').textContent=`archived ${s.archived_at.slice(0,10)} · ${P.name}`;
+  const tiles=[
+    ['Plan',`${S.weeks}<small>wks</small>`,`${fmtDate(P.start)} – ${fmtDate(P.end)}`],
+    ['Workouts done',`${S.workouts_done}<small>/${S.workouts_planned}</small>`,`${S.consistency_pct}% consistency`],
+    ['Miles run',S.run_miles,`${S.planned_miles} planned · ${S.runs} runs`],
+    ['Longest run',`${S.longest_run_mi}<small>mi</small>`,P.race?P.race.name:''],
+  ];
+  app.appendChild(el('section',{},[
+    el('h2',{text:`${P.name} · archive`}),
+    el('div',{class:'grid tiles'},tiles.map(([k,v,dd])=>el('div',{class:'card tile'},[
+      el('div',{class:'k',text:k}), el('div',{class:'v',html:String(v)}), el('div',{class:'d',html:dd||''})]))),
+    el('div',{class:'archnote',text:'A frozen snapshot: runs, evaluations, the race projection and results as they stood when the plan was archived.'})]));
+  RACEVIEW=s.race;
+  const d={race:s.race,results:s.results,plan:s.workouts};
+  const resSec=renderResults(d); if(resSec) app.appendChild(resSec);
+  const raceSec=renderRace(d); if(raceSec) app.appendChild(raceSec);
+  app.appendChild(renderSchedule(s.workouts,{readonly:true}));
+}
+
+function renderTabs(plans){
+  const nav=$('#plantabs'); nav.innerHTML='';
+  const list=(plans||[]).filter(p=>p.status==='active'||p.has_archive);
+  if(list.length<2){nav.hidden=true;return;}
+  nav.hidden=false;
+  list.forEach(p=>{const key=p.status==='active'?'active':p.key;
+    const b=el('button',{role:'tab','aria-selected':String(VIEW===key)},[
+      el('span',{text:p.short||p.name}),p.status==='archived'?el('span',{class:'tabtag',text:'archive'}):null]);
+    b.addEventListener('click',()=>{if(VIEW===key)return;VIEW=key;
+      try{localStorage.setItem('rc.view',key);}catch(e){}
+      window.scrollTo(0,0); show();});
+    nav.appendChild(b);});
 }
 
 // ---- Race day -------------------------------------------------------------
@@ -953,8 +1041,8 @@ function resultCard(r,d){
   return el('div',{class:'card racecard'},kids);
 }
 function openRaceDetails(){
-  const d=DATA; if(!d||!d.race) return;
-  const R=d.race, P=R.projection||{};
+  if(!RACEVIEW) return;
+  const R=RACEVIEW, P=R.projection||{};
   const sheet=$('#racesheet'); sheet.innerHTML='';
   const x=el('button',{class:'closex',html:'&times;'});
   x.addEventListener('click',closeRaceDetails);
@@ -1318,7 +1406,7 @@ sheetGestures($('#sheet'),$('#overlay'),closeDetail,true);
 sheetGestures($('#racesheet'),$('#raceoverlay'),closeRaceDetails,false);
 $('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeDetail();});
 // charts are sized/labelled differently per breakpoint, so redraw on rotate/resize
-window.matchMedia('(max-width:599px)').addEventListener('change',()=>{if(DATA)updateTrends();});
+window.matchMedia('(max-width:599px)').addEventListener('change',()=>{if(DATA&&VIEW==='active')updateTrends();});
 $('#rsoverlay').addEventListener('click',e=>{if(e.target.id==='rsoverlay')closeReschedule();});
 $('#raceoverlay').addEventListener('click',e=>{if(e.target.id==='raceoverlay')closeRaceDetails();});
 document.addEventListener('keydown',e=>{
@@ -1341,9 +1429,21 @@ async function load(keepScroll){
   const y=keepScroll?(window.scrollY||0):0;
   try{
     const r=await fetch('/api/dashboard'); if(!r.ok)throw new Error(r.status);
-    render(await r.json());
+    DATA=await r.json();
+    await show();
     if(keepScroll)window.scrollTo(0,y);   // a reschedule shouldn't fling you to the top
   }catch(e){ $('#app').innerHTML=`<div class="err">Couldn't load data (${e.message}).<br>Is the server running & Garmin synced?</div>`; }
+}
+// draw whichever tab is selected from data already in hand
+async function show(){
+  const known=(DATA.plans||[]).some(p=>p.key===VIEW&&p.has_archive);
+  if(VIEW!=='active'&&!known) VIEW='active';
+  renderTabs(DATA.plans);
+  if(VIEW==='active'){render(DATA);return;}
+  try{
+    if(!ARCH[VIEW]){const r=await fetch(`/api/archive/${VIEW}`); if(!r.ok)throw new Error(r.status); ARCH[VIEW]=await r.json();}
+    renderArchive(ARCH[VIEW]);
+  }catch(e){ $('#app').innerHTML=`<div class="err">Couldn't load the archived plan (${e.message}).</div>`; }
 }
 $('#refresh').addEventListener('click',async()=>{
   const b=$('#refresh'); b.textContent='Syncing…'; b.disabled=true;
