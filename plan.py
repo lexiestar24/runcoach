@@ -26,6 +26,8 @@ def _classify(summary, desc):
     # cut that off or everything looks like a tempo run.
     workout = re.split(r"prehab|effort guide", desc, flags=re.I)[0]
     s = (summary + " " + workout).lower()
+    if "rest day" in summary.lower():
+        return "rest"   # a planned no-run day (injury or recovery swap)
     if "half marathon" in s or "13.1" in s:
         return "race"
     if "time trial" in s:
@@ -56,7 +58,7 @@ def _planned_miles(summary, desc):
 _TYPE_LABEL = {
     "shakeout": "easy shakeout", "long": "long run", "tempo": "tempo",
     "interval": "intervals", "quality": "easy + strides", "easy": "easy run",
-    "race": "HALF MARATHON", "trial": "5K time trial",
+    "race": "HALF MARATHON", "trial": "5K time trial", "rest": "rest day",
 }
 
 
@@ -183,7 +185,8 @@ def plan_with_actuals(conn, path=None):
             # original date marked a run "missed" the moment its planned day
             # passed, even though it had been deliberately moved to a later day
             # that has not arrived yet.
-            item["status"] = "upcoming" if match_date >= dt.date.today().isoformat() else "missed"
+            item["status"] = ("rest" if w["type"] == "rest" else
+                              "upcoming" if match_date >= dt.date.today().isoformat() else "missed")
         out.append(item)
     return out
 

@@ -197,6 +197,7 @@
   .pill.done{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--success-ink)}
   .pill.upcoming{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--blue)}
   .pill.missed{background:color-mix(in srgb,var(--baseline) 30%,transparent);color:var(--text-2)}
+  .pill.rest{background:color-mix(in srgb,var(--baseline) 18%,transparent);color:var(--text-2)}
   .pill.moved{background:color-mix(in srgb,var(--yellow) 18%,transparent);color:var(--yellow)}
   /* reschedule control + dialog */
   .movebtn{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:8px;
@@ -755,7 +756,7 @@ function renderSchedule(planRows,{readonly}){
   const pastWeeks=new Set(SCHED.filter(isPast).map(w=>w.week));
   const past=el('div',{class:'pastwks'});
   if(pastWeeks.size){
-    const done=SCHED.filter(w=>isPast(w)&&w.status==='done').length, tot=SCHED.filter(isPast).length;
+    const done=SCHED.filter(w=>isPast(w)&&w.status==='done').length, tot=SCHED.filter(w=>isPast(w)&&w.type!=='rest').length;
     const tog=el('button',{class:'pasttog','aria-controls':'pastwks'});
     past.id='pastwks';
     const paint=()=>{past.hidden=!pastOpen; tog.setAttribute('aria-expanded',String(pastOpen));
