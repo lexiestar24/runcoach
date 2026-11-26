@@ -805,20 +805,51 @@ function renderSchedule(planRows,{readonly}){
 
 // The plan at a glance: its blocks (current one marked) and standing notes.
 // Mostly for reading a new plan over before it goes on the calendar.
+// The dashboard keeps one compact card (where you are now); every block and
+// the plan notes live in a sheet behind the button, like Race details.
+let PLANVIEW=null;
 function renderOverview(P,rows){
   if(!P||!(P.blocks||[]).length) return null;
+  PLANVIEW={P,rows};
+  const today=new Date().toISOString().slice(0,10);
+  const cur=P.blocks.find(b=>b.start<=today&&today<=b.end);
+  const btn=el('button',{class:'racebtn',text:'Plan details →'});
+  btn.addEventListener('click',openPlanDetails);
+  const head=cur
+    ?`Now: ${cur.name} · week ${Math.floor((new Date(today)-new Date(cur.start))/864e5/7)+1} of ${blkWks(cur)}`
+    :`${fmtDate(P.start)} – ${fmtDate(P.end)}`;
+  return el('section',{},[el('h2',{text:P.name}),
+    el('div',{class:'card racecard'},[
+      el('div',{class:'bn',style:'font-weight:650;font-size:15px',text:head}),
+      cur?el('div',{class:'bd',style:'font-size:12px;color:var(--muted)',text:`${fmtDate(cur.start)} – ${fmtDate(cur.end)}`}):null,
+      btn])]);
+}
+function blkWks(b){return Math.round((new Date(b.end)-new Date(b.start))/864e5/7);}
+function openPlanDetails(){
+  if(!PLANVIEW) return;
+  const {P,rows}=PLANVIEW;
   const today=new Date().toISOString().slice(0,10);
   const mi=b=>rows.filter(w=>w.date>=b.start&&w.date<=b.end).reduce((s,w)=>s+(w.planned_miles||0),0);
-  const wks=b=>Math.round((new Date(b.end)-new Date(b.start))/864e5/7);
-  const kids=[el('h2',{text:`${P.name}: plan overview`}),
+  const sheet=$('#racesheet'); sheet.innerHTML='';
+  const x=el('button',{class:'closex',html:'&times;'});
+  x.addEventListener('click',closeRaceDetails);
+  sheet.appendChild(x);
+  sheet.appendChild(el('div',{class:'grab'}));
+  sheet.appendChild(el('h3',{text:P.name}));
+  sheet.appendChild(el('div',{class:'meta',text:`${fmtDate(P.start)} – ${fmtDate(P.end)} · ${blkWks(P)} wks`}));
+  sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Blocks'}),
     el('div',{class:'blocks'},P.blocks.map(b=>{const now=b.start<=today&&today<=b.end;
       return el('div',{class:'blk'+(now?' now':'')},[
         el('div',{class:'bn'},[el('span',{text:b.name}),now?el('span',{class:'nowtag',text:'now'}):null]),
-        el('div',{class:'bd',text:`${fmtDate(b.start)} – ${fmtDate(b.end)} · ${wks(b)} wks · ${Math.round(mi(b)*10)/10} mi planned`}),
-        el('div',{class:'bf',text:b.focus||''})]);}))];
-  if((P.notes||[]).length) kids.push(el('div',{class:'card',style:'margin-top:10px'},
-    el('ul',{class:'resnotes'},P.notes.map(t=>el('li',{text:t})))));
-  return el('section',{},kids);
+        el('div',{class:'bd',text:`${fmtDate(b.start)} – ${fmtDate(b.end)} · ${blkWks(b)} wks · ${Math.round(mi(b)*10)/10} mi planned`}),
+        el('div',{class:'bf',text:b.focus||''})]);}))]));
+  if((P.notes||[]).length) sheet.appendChild(el('div',{class:'block'},[el('div',{class:'lab',text:'Notes'}),
+    el('ul',{class:'resnotes'},P.notes.map(t=>el('li',{text:t})))]));
+  if(!$('#raceoverlay').classList.contains('open')){
+    if(!$('#overlay').classList.contains('open'))lockScroll();
+    $('#raceoverlay').classList.add('open');
+    sheet.scrollTop=0;
+  }
 }
 
 // ---------- archived plan (read-only snapshot) ----------
